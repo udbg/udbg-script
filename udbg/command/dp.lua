@@ -80,7 +80,8 @@ return function(args, out)
                     if t == 'return' then
                         info = info.string
                         logc('green', get_symbol(i.ptr))
-                        logc('gray', ' ')
+                        local m = get_module(i.ptr)
+                        logc('gray', m and m:find_function(i.ptr) and ' *' or ' ')
                     end
                     logc(color, info)
                 end

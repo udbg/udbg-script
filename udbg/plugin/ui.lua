@@ -175,6 +175,15 @@ function event.on.ui_inited()
         'menuView', 'menuOption', 'menuHelp',
         'menuPlugin', 'status',
     })
+    ui.view_module:add_action {
+        title = '&Dump', on_trigger = function()
+            local m = ui.view_module:line('.', 0)
+            local path = ui.save_path {title = 'Save "'..m..'" To'}
+            if path then
+                ucmd {'dump-memory', '-m', m, path}
+            end
+        end
+    }
 
     if windows then
         local view_thread = ui.view_thread
@@ -203,7 +212,8 @@ function event.on.ui_inited()
         end
         ucmd.register('stack', function(args)
             local function echo(tid, th)
-                if th and th 'suspend' >= 0 then
+                if th then
+                    th 'suspend'
                     local sp = hex(th('reg', '_sp'))
                     log('[stack] ' .. tid .. ' sp: ' .. sp)
                     ucmd('dp -r ' .. sp .. ' 30')

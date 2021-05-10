@@ -196,35 +196,12 @@ ListenKey.__index = ListenKey do
 end
 
 do      -- ui utils
-    local WRITE_FILE = 1001
-    local READ_FILE = 1003
-
-    function ui.save_path(path)
-        return ui.input {
-            type = 'file',
-            title = 'Save File',
-            path = path,
-        }
-    end
-
-    local MAKE_DIR<const> = 9
-    -- make a directory
-    ---@param dir string
-    ---@return boolean
-    function ui.make_dir(dir)
-        return ui_request(MAKE_DIR, dir)
-    end
-
-    -- read file content
-    ---@param path string
-    ---@return string
-    function ui.readfile(path)
-        path = path:gsub('$data', __data_dir or '')
-        return ui_request(READ_FILE, path)
-    end
-
-    function ui.writefile(path, data)
-        return ui_request(WRITE_FILE, {path, data})
+    function ui.save_path(opt)
+        opt = opt or {}
+        opt.type = 'file'
+        opt.title = opt.title or 'Save File'
+        opt.path = opt[1] or opt.path
+        return ui.input(opt)
     end
 
     local INFO = 3
@@ -775,6 +752,131 @@ local Widget = {} do
     end
 
     ui.main = register_ctrl {_ctrl_id = 1}
+end
+
+do      -- io utils
+    local MAKE_DIR<const> = 9
+    local OPEN_FILE<const> = 30
+    local READ_FILE<const> = 31
+    local WRITE_FILE<const> = 32
+    local CLOSE_FILE<const> = 33
+
+    local OPEN_PROGRAM<const> = 40
+    local READ_STDOUT<const> = 41
+    local READ_STDERR<const> = 42
+    local WRITE_STDIN<const> = 43
+    local WAIT_PROGRAM<const> = 44
+    local KILL_PROGRAM<const> = 45
+    local CLOSE_PROGRAM<const> = 46
+    local WAIT_OUTPUT<const> = 47
+
+    local READ_THE_FILE<const> = 1003
+
+    local File = {}
+    File.__index = File
+
+    function File:read(size)
+        return ui_request(READ_FILE, {self.__id, size})
+    end
+
+    function File:write(data)
+        return ui_notify(WRITE_FILE, {self.__id, data})
+    end
+
+    function File:close()
+        if self.__id then
+            ui_notify(CLOSE_FILE, self.__id)
+            self.__id = nil
+        end
+    end
+    File.__gc = File.close
+    File.__close = File.close
+
+    local Child = {}
+    Child.__index = Child
+
+    function Child:read(size)
+        return ui_request(READ_STDOUT, {self.__id, size})
+    end
+
+    function Child:read_stderr(size)
+        return ui_request(READ_STDERR, {self.__id, size})
+    end
+
+    function Child:wait()
+        return ui_request(WAIT_PROGRAM, {self.__id, false})
+    end
+
+    function Child:try_wait()
+        return ui_request(WAIT_PROGRAM, {self.__id, true})
+    end
+
+    function Child:wait_output()
+        local res = ui_request(WAIT_OUTPUT, self.__id)
+        self.__id = nil
+        res.status = res[1]
+        res.stdout = res[2]
+        res.stderr = res[3]
+        return res
+    end
+
+    function Child:__gc()
+        ui_notify(CLOSE_PROGRAM, self.__id)
+        self.__id = nil
+    end
+
+    -- make a directory
+    ---@param dir string
+    ---@return boolean
+    function ui.make_dir(dir)
+        return ui_request(MAKE_DIR, dir)
+    end
+
+    -- read file content
+    ---@param path string
+    ---@return string
+    function ui.readfile(path)
+        path = path:gsub('$data', __data_dir or '')
+        return ui_request(READ_THE_FILE, path)
+    end
+
+    function ui.writefile(path, data)
+        local f<close> = ui.openfile(path, true)
+        local size = 0x4000
+        local i = 0
+        while true do
+            local item = data:sub(i + 1, i + size)
+            if #item == 0 then break end
+            f:write(item)
+            i = i + size
+        end
+    end
+
+    function ui.writefile_once(path, data)
+        local WRITE_FILE = 1001
+        return ui_request(WRITE_FILE, {path, data})
+    end
+
+    function ui.openfile(path, write)
+        return setmetatable({__id = ui_request(OPEN_FILE, {path, write or false})}, File)
+    end
+
+    function ui.program(opt)
+        if type(opt) ~= 'table' then
+            opt = {opt}
+        end
+
+        local args = opt
+        local res = ui_request(OPEN_PROGRAM, {
+            args,
+            opt.stdout ~= nil and opt.stdout or false,
+            opt.stderr ~= nil and opt.stderr or false,
+            opt.stdin ~= nil and opt.stdin or false,
+        })
+        res.__id = res[1]
+        res.pid = res[2]
+        return setmetatable(res, Child)
+    end
 end
 
 do      -- debug view

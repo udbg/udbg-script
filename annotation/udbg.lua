@@ -82,6 +82,10 @@ function get_memory_map() end
 ---@return fun():MemoryPage
 function enum_memory() end
 
+-- enum process's handle
+---@return fun():integer,integer,string,string @handle,type_index,type_name,name
+function enum_handle(pid) end
+
 ---assemble a statement
 ---@param address integer
 ---@param asm string

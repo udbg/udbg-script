@@ -13,6 +13,10 @@ return function(args)
         local m = get_module(args.module)
         args.base = m.base
         args.size = m.size
+    else
+        args.base = EA(args.base)
     end
-    writefile(args.path, read_bytes(EA(args.base), args.size))
+    log('[dump-memory]', hex(args.base), hex(args.size))
+    ui.writefile(args.path, read_bytes(args.base, args.size))
+    log('[dump-memory]', 'done')
 end, parser
