@@ -1,7 +1,15 @@
 
 local ui = require 'udbg.ui'
 
-ui.menu_option = ui.main:find_child 'menuOption'
+ui.g_status, ui.actionStepIn, ui.actionStepOut, ui.actionRun,
+ui.actionHandled, ui.actionRunToReturn, ui.actionAbout,
+ui.menu_option, ui.menu_plugin = table.unpack(
+    ui.main:find_child {
+        'status', 'actionStepIn', 'actionStepOut', 'actionRun',
+        'actionHandled', 'actionRunToReturn', 'actionAbout',
+        'menuOption', 'menuPlugin',
+    }
+)
 ui.menu_option:add_action {
     title = '&Data Folder',
     icon = ':/ico/res/folder-horizontal-open.png',
@@ -9,14 +17,6 @@ ui.menu_option:add_action {
         os.execute('start '..g_config.data_dir)
     end
 }
-
-ui.g_status, ui.actionStepIn, ui.actionStepOut, ui.actionRun,
-ui.actionHandled, ui.actionRunToReturn, ui.actionAbout = table.unpack(
-    ui.main:find_child {
-        'status', 'actionStepIn', 'actionStepOut', 'actionRun',
-        'actionHandled', 'actionRunToReturn', 'actionAbout',
-    }
-)
 
 local function user_reply(...)
     local args = {'ui.continue', ...}

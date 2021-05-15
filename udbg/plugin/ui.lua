@@ -168,10 +168,12 @@ end
 
 function event.on.ui_inited()
     ui.view_module, ui.view_pages, ui.view_thread,
+    ui.view_handle,
     ui.menu_view, ui.menu_option, ui.menu_help,
     ui.menu_plugin, ui.g_status =
     table.unpack(ui.main:find_child {
         'module', 'memoryLayout', 'thread',
+        'handle',
         'menuView', 'menuOption', 'menuHelp',
         'menuPlugin', 'status',
     })
@@ -257,7 +259,7 @@ end
 
 function event.on.user_close()
     local exit = true
-    if udbg.target and not udbg.dbgopt.open then
+    if udbg.target and udbg.target.status ~= 'opened' then
         exit = ui.dialog {
             title = 'Target is running', parent = true;
             min_hint = false, max_hint = false;
@@ -278,7 +280,9 @@ function ui.load_target_data()
         ui.info('[config]', 'load', path)
         table.update(udbg.config, json.decode(data))
     end
-    if udbg.dbgopt.open then return end
+    if udbg.target.status == 'opened' then
+        __config.backup_breakpoint = false
+    end
 
     if __config.backup_breakpoint then
         local path = __data_dir..'/bplist.json'
@@ -355,9 +359,7 @@ function event.on.target_success()
         ui.goto_cpu(m.entry_point)
     end
 
-    if udbg.dbgopt.open then
-        ui.g_status.value = 'Opened'
-    end
+    ui.g_status.value = target.status:gsub('^.', string.upper)
     ui.load_target_data()
 end
 

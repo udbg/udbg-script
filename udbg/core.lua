@@ -358,6 +358,7 @@ do
     ---@field psize integer
     ---@field arch string
     ---@field path string
+    ---@field status string @readonly "idle" "opened" "attached" "paused" "running" "ended"
     ---@field image_base integer
 
     ---start a debug session

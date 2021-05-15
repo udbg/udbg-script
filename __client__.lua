@@ -26,7 +26,7 @@ verbose('[root_dir]', root_dir)
 verbose('[args]', pretty ^ args)
 
 local config = {
-    edit_cmd = 'notepad %1',
+    edit_cmd = 'start notepad %1',
     data_dir = false,
     plugins = {},
     remote_map = {},
@@ -148,16 +148,26 @@ do  -- rpc service function
     end
 
     function service.execute_cmd(cmdline)
+        cmdline = cmdline:trim()
         local argv = require 'udbg.cmd'.parse(cmdline)
         local cmd = table.remove(argv, 1)
         client:add_history(cmdline)
         if cmd == '.edit' then
-            local p = argv[1]
-            assert(p, 'no file')
-            if not path.isfile(p) and not path.isabs(p) then
-                p = find_lua('autorun/'..p) or find_lua('autorun/'..p..'.lua') or find_lua('autorun/'..p..'.client.lua')
+            local p = assert(argv[1], 'no file')
+            local script_path
+            if not path.isabs(p) then
+                if not path.isfile(p) then
+                    script_path = find_lua('autorun/'..p) or find_lua('autorun/'..p..'.lua') or find_lua('autorun/'..p..'.client.lua')
+                end
+                if not script_path then
+                    local dir = path.isdir(config_dir) and config_dir or script_dir
+                    script_path = path.withext(path.join(dir, 'autorun', p), 'lua')
+                    writefile(script_path, '')
+                end
             end
-            os.execute(config.edit_cmd:gsub('%%1', p))
+            if script_path then
+                os.execute(config.edit_cmd:gsub('%%1', script_path))
+            end
         else
             log("[cmd] >> ", cmdline);
             g_session:notify('execute_cmd', cmdline)
@@ -315,7 +325,6 @@ do  -- start session
             end
         end
     end
-    -- client:watch('autorun')
     for _, dir in ipairs(plugin_dirs) do
         client:watch(path.join(dir, 'autorun'))
     end

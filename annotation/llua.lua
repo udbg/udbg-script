@@ -60,6 +60,12 @@ function os.path.basename(path) end
 ---@return string,string
 function os.path.splitext(path) end
 
+---set path extension to @ext
+---@param path string
+---@param ext string
+---@return string
+function os.path.withext(path, ext) end
+
 function os.path.join(dir, ...) end
 
 function os.path.isabs(path) end
