@@ -1,22 +1,9 @@
 
-local service = {}
+local service = require 'udbg.base.service'
 local types = require 'udbg.types'
 local ui = require 'udbg.ui'
 local event = require 'udbg.event'
 local unpack, type = table.unpack, type
-
-function service:__newindex(key, val)
-    if type(val) == 'function' then
-        local i = debug.getinfo(val, 'u')
-        if i.nparams > 1 or i.isvararg then
-            local origin = val
-            local unpack = table.unpack
-            val = function(args) return origin(unpack(args)) end
-        end
-    end
-    rawset(self, key, val)
-end
-setmetatable(service, service)
 
 local creg = debug.getregistry()
 creg[udbg.ref_rpc] = function(method, data)

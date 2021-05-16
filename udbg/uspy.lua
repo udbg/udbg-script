@@ -14,7 +14,7 @@ local function call_spy(fun, nowait)
         if not n then break end
         table.insert(ups, v)
     end
-    local result, err = spy_lua('', mpack(ups), nowait)
+    local result, err = spy_lua('@call', mpack(ups), nowait)
     if err then
         ui.error(err)
     elseif #result > 0 then

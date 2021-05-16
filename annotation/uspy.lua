@@ -1,4 +1,6 @@
 
+uspy = {}
+
 ---@class HookArgs
 ---@field trampoline integer @trampoline address
 
