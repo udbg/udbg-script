@@ -18,6 +18,7 @@ package.path = table.concat(lua_paths, ';') .. ';' .. origin_paths
 require 'udbg.lua'
 local ui = require 'udbg.ui'
 local event = require 'udbg.event'
+event.error = ui.error
 _ENV.ui, _ENV.uevent = ui, event
 local readfile = readfile
 local verbose = args.verbose and ui.log or function() end
@@ -79,6 +80,60 @@ local function find_lua(name)
             return p
         end
     end
+end
+
+local function execute_lua(lua_path)
+    local data = readfile(lua_path)
+    if data then
+        -- TODO: bugfix notify
+        g_session:request('lua_execute', {data, lua_path})
+    else
+        ui.warn('read', lua_path, 'failed')
+    end
+end
+
+local function execute_bin(lua_path)
+    if not path.isfile(lua_path) then
+        local p = 'udbg/bin/'..lua_path
+        p = find_lua(p) or find_lua(p .. '.lua') or find_lua(p .. '.luac')
+        if not p then
+            ui.warn(lua_path, 'not found')
+        else
+            lua_path = p
+        end
+    end
+    if lua_path and path.isfile(lua_path) then
+        execute_lua(lua_path)
+        return lua_path
+    end
+end
+
+local ucmd = require 'udbg.cmd'
+do
+    ucmd.prefix = 'udbg.client.cmd.'
+
+    function ucmd.load(modpath)
+    end
+
+    ucmd.register('.edit', function(argv)
+        local p = assert(argv[1], 'no file')
+        local script_path
+        if not path.isabs(p) then
+            if not path.isfile(p) then
+                script_path = find_lua('autorun/'..p) or find_lua('autorun/'..p..'.lua') or find_lua('autorun/'..p..'.client.lua')
+            end
+            if not script_path then
+                local dir = path.isdir(config_dir) and config_dir or script_dir
+                script_path = path.withext(path.join(dir, 'autorun', p), 'lua')
+                writefile(script_path, '')
+            end
+        end
+        if script_path then
+            os.execute(config.edit_cmd:gsub('%%1', script_path))
+        end
+    end)
+
+    ucmd.register('.exec', function(argv) execute_bin(argv[1]) end)
 end
 
 do  -- rpc service function
@@ -149,29 +204,18 @@ do  -- rpc service function
 
     function service.execute_cmd(cmdline)
         cmdline = cmdline:trim()
-        local argv = require 'udbg.cmd'.parse(cmdline)
-        local cmd = table.remove(argv, 1)
         client:add_history(cmdline)
-        if cmd == '.edit' then
-            local p = assert(argv[1], 'no file')
-            local script_path
-            if not path.isabs(p) then
-                if not path.isfile(p) then
-                    script_path = find_lua('autorun/'..p) or find_lua('autorun/'..p..'.lua') or find_lua('autorun/'..p..'.client.lua')
-                end
-                if not script_path then
-                    local dir = path.isdir(config_dir) and config_dir or script_dir
-                    script_path = path.withext(path.join(dir, 'autorun', p), 'lua')
-                    writefile(script_path, '')
-                end
+        log("[cmd] >> ", cmdline)
+        if cmdline:sub(1, 1) == '.' then
+            local argv = ucmd.parse(cmdline)
+            local name = table.remove(argv, 1)
+            local cmd = ucmd.find(name)
+            if cmd then
+                cmd.main(argv, ui.log)
+                return
             end
-            if script_path then
-                os.execute(config.edit_cmd:gsub('%%1', script_path))
-            end
-        else
-            log("[cmd] >> ", cmdline);
-            g_session:notify('execute_cmd', cmdline)
         end
+        g_session:notify('execute_cmd', cmdline)
     end
 end
 
@@ -191,16 +235,6 @@ do  -- start session
     local ss = client:start_session(remote)
     _ENV.g_session = ss
     _ENV.g_shell_args = args
-
-    local function execute_lua(lua_path)
-        local data = readfile(lua_path)
-        if data then
-            -- TODO: bugfix notify
-            g_session:request('lua_execute', {data, lua_path})
-        else
-            ui.warn('read', lua_path, 'failed')
-        end
-    end
 
     function event.on.ui_inited(map)
         if not args.no_window then
@@ -288,21 +322,9 @@ do  -- start session
 
     -- execute lua for shell-args
     if args.execute then
-        local lua_path = args.execute
-        if not path.isfile(lua_path) then
-            local p = 'udbg/bin/'..lua_path
-            local p = find_lua(p) or find_lua(p .. '.lua') or find_lua(p .. '.luac')
-            if not p then
-                ui.warn(lua_path, 'not found')
-            else
-                lua_path = p
-            end
-        end
-        if lua_path and path.isfile(lua_path) then
-            execute_lua(lua_path)
-            if args.watch then
-                client:watch(lua_path)
-            end
+        local lua_path = execute_bin(args.execute)
+        if lua_path and args.watch then
+            client:watch(lua_path)
         end
     end
 

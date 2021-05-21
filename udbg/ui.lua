@@ -727,7 +727,7 @@ local Widget = {} do
         return register_ctrl(opt, 'action')
     end
 
-    function ui.on_ctrl_event(ctrl_id, event, a1, a2)
+    function ui.on_ctrl_event(ctrl_id, event, a1, a2, a3)
         local data = qobj_map[ctrl_id]
         -- print('[on_ctrl_event]', ctrl_id, event)
         if not data then
@@ -742,7 +742,7 @@ local Widget = {} do
 
         local handler = data[event]
         if handler then
-            local ok, err = xpcall(handler, traceback, data, a1, a2)
+            local ok, err = xpcall(handler, traceback, data, a1, a2, a3)
             if not ok then
                 ui.error((data.class or '')..'.'..event..'@'..(data.name or hex(ctrl_id)), err)
             end

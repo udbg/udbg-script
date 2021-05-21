@@ -10,6 +10,14 @@ require 'udbg.alias'
 ucmd = require 'udbg.cmd'
 ucmd.prefix = 'uspy.command.'
 
+function ucmd.load(modpath)
+    -- try load from remote client
+    local path, data = __loadremote(modpath)
+    if data then
+        return assert(load(data, path))()
+    end
+end
+
 function inline_once(address, callback)
     inline_hook(address, function(...)
         callback(...)

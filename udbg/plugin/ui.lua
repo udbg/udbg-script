@@ -168,12 +168,12 @@ end
 
 function event.on.ui_inited()
     ui.view_module, ui.view_pages, ui.view_thread,
-    ui.view_handle,
+    ui.view_handle, ui.view_mem,
     ui.menu_view, ui.menu_option, ui.menu_help,
     ui.menu_plugin, ui.g_status =
     table.unpack(ui.main:find_child {
         'module', 'memoryLayout', 'thread',
-        'handle',
+        'handle', 'memory',
         'menuView', 'menuOption', 'menuHelp',
         'menuPlugin', 'status',
     })
@@ -186,6 +186,16 @@ function event.on.ui_inited()
             end
         end
     }
+
+    function ui.view_mem:on_modify(a, ty, val)
+        if ty:find'^f' then
+            val = tonumber(val)
+        else
+            val = tonumber(val, 16)
+        end
+        log('mem', hex(a), ty, val)
+        write_type(a, ty, val)
+    end
 
     if windows then
         local view_thread = ui.view_thread
@@ -247,6 +257,11 @@ function event.on.ui_inited()
     actionStop.on_trigger = ui.stop_target
     actionPause.on_trigger = udbg.pause
     actionRestart.on_trigger = ui.restart_target
+
+    ui.menu_option:add_action {
+        title = 'Command &Cache', checked = true,
+        on_trigger = function(self, val) ucmd.use_cache = val end
+    }
 
     if udbg.dbgopt.target then
         udbg.start(udbg.dbgopt)

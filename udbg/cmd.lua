@@ -7,7 +7,10 @@ function lapp.quit(msg, no_usage)
     ui.error(msg) error('')
 end
 
-local cmd = {use_cache = false, prefix = 'udbg.command.'}
+local cmd = {
+    use_cache = true,
+    prefix = 'udbg.command.'
+}
 setmetatable(cmd, cmd)
 
 local function split_cmdline(cmdline)
@@ -82,6 +85,13 @@ function cmd.parse(cmdline, parse_number)
     return r, filter, outype, name
 end
 
+function cmd.load(modpath)
+    local path = package.searchpath(modpath, package.path)
+    if path then
+        return assert(loadfile(path))()
+    end
+end
+
 local Filter = {} do
     function Filter:__call(...)
         local filter = rawget(self, 'filter')
@@ -152,37 +162,37 @@ function cmd.call_global(cmdline)
     end
 end
 
+---@class Command
+---@field main function
+---@field parser string|nil
+---@field registered boolean|nil
+
 -- find specific command
--- return {fun: function, parser: ?string}
-local cache = {}
+---@type table<string, Command>
+local cache = {} cmd.cache = cache
+
+---find command by name
+---@param name string
+---@param prefix? string
+---@return Command?
 function cmd.find(name, prefix)
     prefix = prefix or cmd.prefix
     local modpath = prefix .. name
-    local fun, parser
 
     -- try load from cache
     local result = cache[name]
-    if result then return result end
-    -- try load from remote client
-    local path, data = __loadremote(modpath)
-    if data then
-        fun, parser = assert(load(data, path))()
-    end
-    -- try load from file
-    if not fun then
-        local f = searchpath(modpath)
-        if f then
-            fun, parser = assert(loadfile(f))()
-        end
+    if not cmd.use_cache and result and not result.registered then
+        result = nil
     end
 
-    if fun then
-        result = {fun = fun, parser = parser}
-        if cmd.use_cache then
-            cache[name] = result
-        end
-        return result
+    -- try load from file
+    if not result then
+        main, parser = cmd.load(modpath)
+        result = {main = main, parser = parser}
+        cache[name] = result
     end
+
+    return result
 end
 
 local function table_outer(name)
@@ -254,6 +264,9 @@ local function table_outer(name)
     return setmetatable(outer, outer)
 end
 
+---dispatch command
+---@param cmdline string|table
+---@param prefix? string
 function cmd.dispatch(cmdline, prefix)
     local argv, filter, outype, outname
     if type(cmdline) == 'table' then
@@ -272,7 +285,7 @@ function cmd.dispatch(cmdline, prefix)
 
     -- parse cmdline
     local err, suc, args, task
-    local fun, parser = command.fun, command.parser
+    local main, parser = command.main, command.parser
     if type(parser) == 'table' then
         task = parser.task
         parser = parser.parser
@@ -303,11 +316,11 @@ function cmd.dispatch(cmdline, prefix)
         end
         -- outer.filter = filter
         outer.lua_filter = filter
-        local function docmd() fun(args, outer) end
+        local function docmd() main(args, outer) end
         if task then
             function docmd()
                 require 'udbg.task'.spawn(function()
-                    fun(args, outer)
+                    main(args, outer)
                 end, {name = cmdline})
             end
         end
@@ -317,12 +330,12 @@ function cmd.dispatch(cmdline, prefix)
 end
 
 function cmd.register(name, a1, a2)
-    local parser, fun
-    if a2 then parser, fun = a1, a2
-    else fun = a1 end
+    local parser, main
+    if a2 then parser, main = a1, a2
+    else main = a1 end
 
-    assert(type(fun) == 'function')
-    cache[name] = {parser = parser, fun = fun}
+    assert(type(main) == 'function')
+    cache[name] = {parser = parser, main = main, registered = true}
 end
 
 function cmd.wrap(cmdline)

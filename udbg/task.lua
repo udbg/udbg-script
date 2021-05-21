@@ -19,6 +19,7 @@ function t.spawn(callback, opt)
     end
 
     opt.thread = thread.spawn(function()
+        opt.coroutine = coroutine.running()
         local ok, err = xpcall(callback, debug.traceback, opt)
         if not ok then
             require 'udbg.ui'.error('[task]', opt.name, err)
