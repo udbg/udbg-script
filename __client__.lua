@@ -217,6 +217,17 @@ do  -- rpc service function
         end
         g_session:notify('execute_cmd', cmdline)
     end
+
+    function service.collect_commands()
+        local result = table {}
+        for _, dir in ipairs(plugin_dirs) do
+            for p in os.glob(path.join(dir, 'udbg', 'command', '*')) do
+                local cmd = path.splitext(path.basename(p))
+                result:insert(cmd)
+            end
+        end
+        return result
+    end
 end
 
 do  -- start session
