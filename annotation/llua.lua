@@ -8,6 +8,13 @@ __llua_arch = ''
 ---@type integer @pointer width, in bytes
 __llua_psize = 8
 
+---@type string | "'linux'" | "'macos'" | "'ios'" | "'freebsd'" | "'dragonfly'" | "'netbsd'" | "'openbsd'" | "'solaris'" | "'android'" | "'windows'"
+os.name = ''
+---@type string | "'x86'" | "'x86_64'" | "'arm'" | "'aarch64'" | "'mips'" | "'mips64'" | "'powerpc'" | "'powerpc64'" | "'riscv64'" | "'s390x'" | "'sparc64'"
+os.arch = ''
+---@type string | "'windows'" | "'unix'"
+os.family = ''
+
 ---get the file name where caller defined
 ---@return string
 function __file__() end

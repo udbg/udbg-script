@@ -1,5 +1,18 @@
 
-local msgpack = require 'msgpack'
+local Session = debug.getregistry().Session
+
+function Session:__call(arg)
+    if type(arg) == 'function' then
+        local fun = arg
+        local ups = {string.dump(fun)}
+        for i = 2, 100 do
+            local n, v = debug.getupvalue(fun, i)
+            if not n then break end
+            table.insert(ups, v)
+        end
+        self:notify('@call', ups)
+    end
+end
 
 local service = {}
 local unpack = table.unpack

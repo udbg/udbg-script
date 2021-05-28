@@ -1,7 +1,8 @@
 
-local client, args = ...
+local client, args, service = ...
 local path = os.path
 _ENV.g_client = client
+_ENV.service = service
 
 local root_dir = client:get 'root'
 local script_dir = path.join(root_dir, 'script')
@@ -82,8 +83,8 @@ local function find_lua(name)
     end
 end
 
-local function execute_lua(lua_path)
-    local data = readfile(lua_path)
+local function execute_lua(lua_path, data)
+    data = data or readfile(lua_path)
     if data then
         -- TODO: bugfix notify
         g_session:request('lua_execute', {data, lua_path})
@@ -137,9 +138,7 @@ do
 end
 
 do  -- rpc service function
-    local service = debug.getregistry()
     local searchpath = package.searchpath
-    _ENV.service = service
 
     local on_ctrl_event = ui.on_ctrl_event
     service.on_ctrl_event = function(args)
@@ -351,10 +350,24 @@ do  -- start session
         verbose('[file-write]', p)
         local _, ext = path.splitext(p)
         if ext:startswith 'lua' then
-            if p:find 'client' then
-                assert(event.async_call(assert(loadfile(p))))
+            local data = assert(readfile(p))
+            local isclient = false
+            -- local lineiter = data:gsplit '\n'
+            -- local target = nil
+            -- for i = 1, 10 do
+            --     local line = lineiter()
+            --     if not line then break end
+            --     line:match ''
+            --     if line:find '%s*%-%-+%s*udbg@(.*)' then
+            --         isclient = true
+            --     end
+            -- end
+
+            if isclient then
+                ui.info('[client]', p)
+                assert(event.async_call(assert(load(data, p))))
             else
-                execute_lua(p)
+                execute_lua(p, data)
             end
         end
     end

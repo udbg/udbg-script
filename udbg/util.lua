@@ -214,10 +214,11 @@ do -------- Extend global --------
     end
     set_psize(__llua_psize)
 
-    local cs = capstone(__llua_arch)
+    local cs = capstone(os.arch)
     local dis = cs.disasm
     function disasm(address)
-        return dis(cs, address)
+        local insns = dis(cs, address)
+        return insns and insns[1]
     end
 
     function uevent.on.context_change(psize, arch)

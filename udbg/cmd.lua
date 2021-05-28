@@ -188,7 +188,7 @@ function cmd.find(name, prefix)
     -- try load from file
     if not result then
         main, parser = cmd.load(modpath)
-        result = {main = main, parser = parser}
+        result = {main = main, parser = parser, name = name}
         cache[name] = result
     end
 
@@ -335,7 +335,7 @@ function cmd.register(name, a1, a2)
     else main = a1 end
 
     assert(type(main) == 'function')
-    cache[name] = {parser = parser, main = main, registered = true}
+    cache[name] = {parser = parser, main = main, registered = true, name = name}
 end
 
 function cmd.wrap(cmdline)

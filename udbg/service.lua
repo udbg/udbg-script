@@ -5,15 +5,6 @@ local ui = require 'udbg.ui'
 local event = require 'udbg.event'
 local unpack, type = table.unpack, type
 
-local creg = debug.getregistry()
-creg[udbg.ref_rpc] = function(method, data)
-    local callback = service[method]
-    if callback then
-        return callback(data)
-    end
-    error 'invalid lua method'
-end
-
 service.on_listen_key = ui.on_listen_key
 service.on_ctrl_event = ui.on_ctrl_event
 

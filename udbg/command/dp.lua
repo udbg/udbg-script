@@ -58,7 +58,7 @@ return function(args, out)
                 local extra
                 if info then
                     if t == 'return' then
-                        extra = info.string
+                        extra = info[1].string
                         info = get_symbol(i.ptr)
                     end
                 end
@@ -78,7 +78,7 @@ return function(args, out)
                 logc('yellow', fmt_size(i.ptr) .. ' ')
                 if info then
                     if t == 'return' then
-                        info = info.string
+                        info = info[1].string
                         logc('green', get_symbol(i.ptr))
                         local m = get_module(i.ptr)
                         logc('gray', m and m:find_function(i.ptr) and ' *' or ' ')

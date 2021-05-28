@@ -1,7 +1,15 @@
 
 require 'udbg.lua'
+
+local uspy = {}
+
+local udbg = g_udbg
+local notify, request = udbg.notify, udbg.request
+function ui_notify(method, args) return notify(udbg, method, args) end
+function ui_request(method, args) return request(udbg, method, args) end
+
 require 'udbg.ui'
-require 'uspy.service'
+uspy.service = require 'uspy.service'
 
 local dbg_, concat = dbg_, string.concat
 function dbg(...) return dbg_(concat(...)) end
@@ -24,3 +32,6 @@ function inline_once(address, callback)
         disable_hook(address)
     end)
 end
+
+_ENV.uspy = uspy
+return uspy

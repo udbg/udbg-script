@@ -21,8 +21,8 @@ local function disup(cs, address, offset)
     while a < address do
         local d = cs:disasm(a)
         if not d or #d == 0 then break end
-        table.insert(result, d)
-        a = a + d.size
+        table.insert(result, d[1])
+        a = a + d[1].size
     end
     return result, a
 end
@@ -32,8 +32,8 @@ local function discount(cs, address, count)
     while #result < count do
         local d = cs:disasm(address)
         if not d or #d < 1 then break end
-        table.insert(result, d)
-        address = address + d.size
+        table.insert(result, d[1])
+        address = address + d[1].size
     end
     return result
 end
