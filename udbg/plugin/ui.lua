@@ -146,8 +146,8 @@ function ui.show_attach()
             column_width = {7, 20, 30, 50, 100},
 
             on_dblclick = function(self, line)
-                attach(line.data, self:find 'only-open'.value)
-                self._root:close()
+                attach(line.data, self:find 'only-open':get 'checked')
+                self._root 'close'
             end
         },
         ui.hbox {
@@ -156,14 +156,14 @@ function ui.show_attach()
             ui.buttonbox {
                 fixed = 'h', 'ok', 'cancel',
                 on_accept = function(self)
-                    attach(self:find'process-list':line '.', self:find 'only-open'.value)
-                    self._root:close()
+                    attach(self:find'process-list':line '.', self:find 'only-open':get 'checked')
+                    self._root 'close'
                 end,
             },
         }
-    }:raise()
+    } 'raise'
     update_list(dlg)
-    dlg:exec()
+    dlg:call 'exec'
 end
 
 function event.on.ui_inited()
@@ -203,8 +203,8 @@ function event.on.ui_inited()
             local a = PA(view_thread:line('.', 1):match'%x+')
             ui.goto_cpu(a)
         end
-        view_thread:set_title('TID', 'Entry', 'TEB', 'PC', 'Status', 'Priority', 'Suspend Count', 'Last Error')
-        view_thread:set_width(6, 24, 18, 16, 12, 8, 4, 12)
+        view_thread:set('columns', {'TID', 'Entry', 'TEB', 'PC', 'Status', 'Priority', 'Suspend Count', 'Last Error'})
+        view_thread:set('columnWidths', {6, 24, 18, 16, 12, 8, 4, 12})
         view_thread:add_action 'Goto Entry'.on_trigger = view_thread.on_dblclick
         view_thread:add_action 'Goto TEB'.on_trigger = function()
             local a = PA(view_thread:line('.', 2))
@@ -280,7 +280,7 @@ function event.on.user_close()
             min_hint = false, max_hint = false;
             ui.label 'really exit?',
             ui.buttonbox {'yes', 'no'},
-        }:exec() > 0
+        }:call 'int exec' > 0
     end
     if exit then
         ui.save_target_data()
@@ -374,7 +374,7 @@ function event.on.target_success()
         ui.goto_cpu(m.entry_point)
     end
 
-    ui.g_status.value = target.status:gsub('^.', string.upper)
+    ui.g_status:set('text', target.status:gsub('^.', string.upper))
     ui.load_target_data()
 end
 

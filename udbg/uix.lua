@@ -74,7 +74,7 @@ do      -- counter table
             column_title = {'count', 'value', 'symbol'},
             column_width = {8, 30, 100}
         }
-        ui.dialog {title = 'Count: ' .. name, t}:show():raise()
+        ui.dialog {title = 'Count: ' .. name, t} 'show' 'raise'
         local count_cache = {}
         local index_cache = {}
         local index = 0

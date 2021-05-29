@@ -1,8 +1,7 @@
 
-local client, args, service = ...
+local client, args = ...
 local path = os.path
 _ENV.g_client = client
-_ENV.service = service
 
 local root_dir = client:get 'root'
 local script_dir = path.join(root_dir, 'script')
@@ -16,6 +15,9 @@ local lua_paths = {
 }
 package.path = table.concat(lua_paths, ';') .. ';' .. origin_paths
 
+local service = require 'udbg.base.service'
+_ENV.service = service; client.service = service
+
 require 'udbg.lua'
 local ui = require 'udbg.ui'
 local event = require 'udbg.event'
@@ -28,7 +30,6 @@ verbose('[root_dir]', root_dir)
 verbose('[args]', pretty ^ args)
 
 local config = {
-    edit_cmd = 'start notepad %1',
     data_dir = false,
     plugins = {},
     remote_map = {},
@@ -53,6 +54,23 @@ do  -- load config/client.lua, init the plugin_dirs and package.path
         end
     end
     assert(path.exists(config.data_dir))
+
+    if not config.edit_cmd then
+        local editor = nil
+        for _, item in ipairs {'code', 'notepad++'} do
+            local _, _, code = io.popen('where ' .. item):close()
+            if code == 0 then
+                editor = item
+                break
+            end
+        end
+        if editor then
+            ui.info('detected editor:', editor)
+            config.edit_cmd = editor .. ' %1'
+        else
+            config.edit_cmd = 'start notepad %1'
+        end
+    end
 
     -- extend client
     function client:exit_ui(code)
@@ -161,17 +179,6 @@ do  -- rpc service function
         end
     end
 
-    local msgpack = require 'msgpack'
-    local mpack, munpack = msgpack.pack, msgpack.unpack
-    function service.call(args)
-        local fun = load(args[1])
-        args[1] = nil
-        for i = 2, #args do
-            debug.setupvalue(fun, i, args[i])
-        end
-        return mpack(fun() or nil)
-    end
-
     function service.ui_info()
         return {'qt', root_dir, config.data_dir}
     end
@@ -225,6 +232,9 @@ do  -- rpc service function
                 result:insert(cmd)
             end
         end
+        for cmd, _ in pairs(ucmd.cache) do
+            result:insert(cmd)
+        end
         return result
     end
 end
@@ -248,7 +258,7 @@ do  -- start session
 
     function event.on.ui_inited(map)
         if not args.no_window then
-            ui.main:show()
+            ui.main 'show'
         end
         require 'udbg.client.ui'
         g_session:notify('fire_event', {'ui-inited', map})
@@ -271,14 +281,14 @@ do  -- start session
 
     function event.on.target_end()
         client.target_alive = false
-        ui.g_status.value = 'Ended'
+        ui.g_status:set('text', 'Ended')
     end
 
     function event.on.session_close()
         _ENV.g_session = nil
         ui.error('session disconnected')
         ui.g_status.style = 'color:red;'
-        ui.g_status.value = 'Disconnect'
+        ui.g_status:set('text', 'Disconnect')
     end
 
     function event.on.user_close()
@@ -351,20 +361,20 @@ do  -- start session
         local _, ext = path.splitext(p)
         if ext:startswith 'lua' then
             local data = assert(readfile(p))
-            local isclient = false
-            -- local lineiter = data:gsplit '\n'
-            -- local target = nil
-            -- for i = 1, 10 do
-            --     local line = lineiter()
-            --     if not line then break end
-            --     line:match ''
-            --     if line:find '%s*%-%-+%s*udbg@(.*)' then
-            --         isclient = true
-            --     end
-            -- end
+            local lineiter = data:gsplit '\n'
+            local target = nil
+            for i = 1, 10 do
+                local line = lineiter()
+                if not line then break end
+                target = line:match '%s*%-%-+%s*udbg@(.-)%s+%-%-+'
+                if target then break end
+            end
 
-            if isclient then
-                ui.info('[client]', p)
+            if target then
+                ui.info('[autorun]', 'target:', target)
+            end
+
+            if target == '.client' then
                 assert(event.async_call(assert(load(data, p))))
             else
                 execute_lua(p, data)

@@ -1,5 +1,24 @@
 
+error 'this file should not be execute'
+
 uspy = {}
+
+---@class Session @RPC Session
+local Session = {}
+
+---notify
+---@param method string
+---@param args any
+function Session:notify(method, args) end
+
+---request
+---@param method string
+---@param args any
+---@return any
+function Session:request(method, args) end
+
+---@type Session
+g_udbg = {}
 
 ---@class HookArgs
 ---@field trampoline integer @trampoline address

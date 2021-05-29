@@ -282,35 +282,14 @@ local Widget = {} do
     local qobj_map = {}     -- qobj_id -> ctrl_data
     -- setmetatable(qobj_map, qobj_map)
 
-    local WIDGET_SHOW<const> = 1600
-    local WIDGET_HIDE<const> = 1601
-    local WIDGET_TOGGLE<const> = 1602
-    local WIDGET_RAISE<const> = 1603
-    local WIDGET_ACTIVE<const> = 1604
-    local WIDGET_TITLE<const> = 1605
-    local WIDGET_VALUE<const> = 1606
-    local WIDGET_VISIBLE<const> = 1607
-    local WIDGET_FOCUS<const> = 1608
-    local WIDGET_STATE<const> = 1609
-    local WIDGET_STYLE<const> = 1610
-    local WIDGET_DELETE<const> = 1670
-    local WIDGET_CLOSE<const> = 1671
-    local WIDGET_CLEAR<const> = 1672
-    local DIALOG_EXEC<const> = 1680
-
-    local WIDGET_START_TIMER<const> = 1700
-    local WIDGET_KILL_TIMER<const> = 1701
-    local WIDGET_SET_TITLE<const> = 1702
-    local WIDGET_SET_VALUE<const> = 1703
-    local WIDGET_SET_VISIBLE<const> = 1704
-    local WIDGET_SET_FOCUS<const> = 1705
-    local WIDGET_SET_STATE<const> = 1706
-    local WIDGET_SET_FORMAT<const> = 1707
-    local WIDGET_SET_ICON<const> = 1708
+    local OBJECT_METADATA<const> = 1600
+    local OBJECT_PROPERTIES<const> = 1601
+    local OBJECT_METHODS<const> = 1602
     local WIDGET_SET_CALLBACK<const> = 1709
-    local WIDGET_SET_STYLE<const> = 1710
     local WIDGET_FIND_CHILD<const> = 1711
-    local WIDGET_INVOKE<const> = 1712
+    local OBJECT_INVOKE<const> = 1712
+    local OBJECT_GET_PROPERTY<const> = 1713
+    local OBJECT_SET_PROPERTY<const> = 1714
 
     local ADD_MENU = 1800
     local ADD_ACTION = 1801
@@ -385,35 +364,39 @@ local Widget = {} do
     end
 
     local GET_ATTR = {
-        value = WIDGET_VALUE,
-        title = WIDGET_TITLE,
-        visible = WIDGET_VISIBLE,
-        focus = WIDGET_FOCUS,
-        state = WIDGET_STATE,
-        style = WIDGET_STYLE,
+        metadata = OBJECT_METADATA,
+        methods = OBJECT_METHODS,
+        properties = OBJECT_PROPERTIES,
     }
-    local SET_ATTR = {
-        value = WIDGET_SET_VALUE,
-        title = WIDGET_SET_TITLE,
-        visible = WIDGET_SET_VISIBLE,
-        focus = WIDGET_SET_FOCUS,
-        state = WIDGET_SET_STATE,
-        format = WIDGET_SET_FORMAT,
-        icon = WIDGET_SET_ICON,
-        style = WIDGET_SET_STYLE,
+    local PROPERTY = {
+        icon = 'icon',
+        focus = 'focus',
+        state =  'windowState',
+        value = 'value',
+        title = 'windowTitle',
+        visible = 'visible',
+        style = 'styleSheet',
     }
 
     local function WidgetGet(self, key)
-        local attr = GET_ATTR[key]
+        local attr = PROPERTY[key] or GET_ATTR[key]
         if attr then
-            return ui_request(attr, self._ctrl_id)
+            if type(attr) == 'number' then
+                return ui_request(attr, self._ctrl_id)
+            else
+                return self:get(attr)
+            end
         end
     end
 
     local function WidgetSet(self, key, val)
-        local attr = SET_ATTR[key]
+        local attr = PROPERTY[key]
         if attr then
-            return ui_notify(attr, {self._ctrl_id, val})
+            if type(attr) == 'number' then
+                return ui_notify(attr, {self._ctrl_id, val})
+            else
+                return self:set(attr, val)
+            end
         end
         if key:find '^on_' then
             ui_notify(WIDGET_SET_CALLBACK, {self._ctrl_id, key})
@@ -421,10 +404,37 @@ local Widget = {} do
         rawset(self, key, val)
     end
 
+    local function WidgetInvoke(self, method, ...)
+        ui_notify(OBJECT_INVOKE, {self._ctrl_id, method or '', ...})
+        return self
+    end
+    Widget.__call = WidgetInvoke
+    Widget.invoke = WidgetInvoke
+
+    function Widget:call(method, ...)
+        return ui_request(OBJECT_INVOKE, {self._ctrl_id, method or '', ...})
+    end
+
     function Widget:__index(key)
         return Widget[key] or WidgetGet(self, key)
     end
     Widget.__newindex = WidgetSet
+
+    ---get OObject's property
+    ---@param prop string
+    ---@return any
+    function Widget:get(prop)
+        return ui_request(OBJECT_GET_PROPERTY, {self._ctrl_id, prop or ''})
+    end
+
+    ---set OObject's property, return self
+    ---@param prop string
+    ---@param value any
+    ---@return Widget
+    function Widget:set(prop, value)
+        ui_notify(OBJECT_SET_PROPERTY, {self._ctrl_id, prop or '', value, false})
+        return self
+    end
 
     function Widget:add_menu(opt)
         local data2ctrl = ui_request(ADD_MENU, {self._ctrl_id, ui.menu(opt)})
@@ -446,14 +456,16 @@ local Widget = {} do
         return opt
     end
 
-    function Widget:delete()
-        ui_notify(WIDGET_DELETE, self._ctrl_id)
-    end
-
+    ---find child in local cache
+    ---@param name string
+    ---@return Widget?
     function Widget:find(name)
         return self._root.childs[name]
     end
 
+    ---find child object by QObject::findChild
+    ---@param name string
+    ---@return Widget?
     function Widget:find_child(name)
         local id = ui_request(WIDGET_FIND_CHILD, {self._ctrl_id, name or ''})
         if type(id) == 'table' then
@@ -466,55 +478,17 @@ local Widget = {} do
         end
     end
 
-    function Widget:invoke(method)
-        ui_notify(WIDGET_INVOKE, {self._ctrl_id, method or ''})
-    end
-
-    function Widget:show()
-        ui_notify(WIDGET_SHOW, self._ctrl_id)
-        return self
-    end
-
-    function Widget:hide()
-        ui_notify(WIDGET_HIDE, self._ctrl_id)
-        return self
-    end
-
-    function Widget:raise()
-        ui_notify(WIDGET_RAISE, self._ctrl_id)
-        return self
-    end
-
-    function Widget:active()
-        ui_notify(WIDGET_ACTIVE, self._ctrl_id)
-        return self
-    end
-
-    function Widget:close()
-        ui_notify(WIDGET_CLOSE, self._ctrl_id)
-        return self
-    end
-
-    function Widget:clear()
-        ui_notify(WIDGET_CLEAR, self._ctrl_id)
-        return self
-    end
-
-    function Widget:exec()
-        return ui_request(DIALOG_EXEC, self._ctrl_id)
-    end
-
-    function Widget:toggle_show()
-        ui_notify(WIDGET_TOGGLE, self._ctrl_id)
-        return self
-    end
-
+    ---start a timer
+    ---@param interval integer @in milliseconds
+    ---@return integer @timer id
     function Widget:start_timer(interval)
-        return ui_request(WIDGET_START_TIMER, {self._ctrl_id, interval or 1000})
+        return self:call('startTimer', interval or 1000)
     end
 
+    ---kill a timer
+    ---@param id integer @timer id
     function Widget:kill_timer(id)
-        ui_notify(WIDGET_KILL_TIMER, {self._ctrl_id, id or 0})
+        self('killTimer', id or 0)
         return self
     end
 
@@ -555,17 +529,9 @@ local Widget = {} do
         ui_notify(TABLE_APPEND, {self._ctrl_id, assert(line)})
     end
 
-    function Widget:set_title(...)
-        ui_notify(TABLE_SET_TITLE, {self._ctrl_id, ...})
-    end
-
     function Widget:set_color(l, c, fg)
         assert(l and c and fg)
         ui_notify(TABLE_SET_COLOR, {self._ctrl_id, l, c, color[fg] or 0})
-    end
-
-    function Widget:set_width(...)
-        ui_notify(TABLE_SET_WIDTH, {self._ctrl_id, ...})
     end
 
     ---create a QLabel

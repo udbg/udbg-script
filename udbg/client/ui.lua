@@ -42,7 +42,7 @@ ui.actionAbout.on_trigger = function()
         title = 'About', parent = true;
         min_hint = false, max_hint = false;
         ui.label {title = about:gsub('%$(%w+)', {version = version}), format = 'markdown'},
-    }:exec()
+    }:call 'exec'
 end
 
 ui.menuRecent = ui.main:find_child 'menuRecent'
@@ -59,7 +59,7 @@ end
 function ui.init_recently()
     local data = readfile(recently_path)
     local list = data and eval(data) or {}
-    ui.menuRecent:clear()
+    ui.menuRecent 'clear'
     for i, path in ipairs(list) do
         ui.menuRecent:add_action {
             title = '&' .. i .. '. ' .. path,

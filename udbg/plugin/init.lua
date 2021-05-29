@@ -7,6 +7,6 @@ end
 
 function uevent.on.target_success()
     if udbg.dbgopt.adaptor == 'windbg' then
-        ui.main:find_child 'actionAutoUpdate'.value = false
+        ui.main:find_child 'actionAutoUpdate':set('checked', false)
     end
 end

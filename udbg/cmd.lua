@@ -210,7 +210,8 @@ local function table_outer(name)
                 end
             },
         },
-    }:show():raise()
+    } 'show' 'raise'
+
     tbl:add_action {
         title = 'Goto &CPU',
         on_trigger = function()
@@ -245,9 +246,9 @@ local function table_outer(name)
     end
     outer.__newindex = function(self, key, val)
         if key == 'width' then
-            tbl:set_width(table.unpack(val))
+            tbl:set('columnWidths', val)
         elseif key == 'title' then
-            tbl:set_title(table.unpack(val))
+            tbl:set('columns', val)
         else
             rawset(self, key, val)
         end
