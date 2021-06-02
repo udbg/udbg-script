@@ -74,8 +74,16 @@ function get_bp_list() end
 ---@field writable boolean
 ---@field executable boolean
 
+---@class UiMemoryPage
+---@field base integer
+---@field alloc_base integer
+---@field size integer
+---@field usage string
+---@field type string
+---@field protect string
+
 -- get list of memory page
----@return MemoryPage[]
+---@return UiMemoryPage[]
 function get_memory_map() end
 
 -- enum memory page

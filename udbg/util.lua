@@ -221,6 +221,16 @@ do -------- Extend global --------
         return insns and insns[1]
     end
 
+    function enum_disasm(a)
+        return function()
+            local insn = disasm(a)
+            if insn then
+                a = a + insn.size
+            end
+            return insn
+        end
+    end
+
     function uevent.on.context_change(psize, arch)
         ui.info('context_change', psize, arch)
         cs = capstone(arch)

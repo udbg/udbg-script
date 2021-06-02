@@ -185,6 +185,12 @@ do
     end
 
     local function on_initbp(tid)
+        local r1, r2 = event.fire 'init-bp'
+        if __config.ignore_initbp then
+            ui.warn('[ignore_initbp]', true)
+        elseif not r1 then
+            r1, r2 = ui.pause('InitBp~'..tid)
+        end
         if __config.bp_process_entry then
             local m = get_module()
             if m then
@@ -192,14 +198,6 @@ do
             else
                 ui.error('[initbp]', 'entry not found')
             end
-        end
-        local r1, r2 = event.fire 'init-bp'
-        if __config.ignore_initbp then
-            ui.warn('[ignore_initbp]', true)
-            return
-        end
-        if not r1 then
-            r1, r2 = ui.pause('InitBp~'..tid)
         end
         return r1, r2
     end

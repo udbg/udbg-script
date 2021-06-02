@@ -23,6 +23,7 @@ ui = require 'udbg.ui'
 ucmd = require 'udbg.cmd'
 ucmd.prefix = 'udbg.command.'
 libffi = require 'libffi'
+utask = require 'udbg.task'
 uevent = require 'udbg.event'
 uevent.error = ui.error
 

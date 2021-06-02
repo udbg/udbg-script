@@ -82,11 +82,9 @@ local isyieldable = coroutine.isyieldable
 ---@return function @as a id, to cancel
 local function on_event(self, event, callback)
     local ty = type(callback)
-    local need_yield
     if ty == "nil" then
         callback = running()
         ty = 'thread'
-        need_yield = true
     end
     if ty == "function" then
         -- if exists, wrapper a function
@@ -105,13 +103,8 @@ local function on_event(self, event, callback)
     if is_new then et[event] = handlers end
 
     et[callback] = handlers
-    if need_yield then
-        local r = state_map[callback]
-        if r then yield(unpack(r)) else yield() end
-    else
-        -- registered function as id
-        return callback
-    end
+    -- registered function as id
+    return callback
 end
 
 mod.on = {__call = on_event}
@@ -132,17 +125,6 @@ function mod.on:__newindex(event, callback)
     end
     event = event:gsub('_', '-')
     return on_event(self, event, callback)
-end
-
----set yield state for current coroutine
-function mod.yield(...)
-    state_map[running()] = {...}
-end
-
----yield current thread, until a event occurred
----@param event string
-function mod.await(event)
-    on_event(nil, event)
 end
 
 mod.async_call = async_call

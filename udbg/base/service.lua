@@ -1,16 +1,39 @@
 
 local Session = debug.getregistry().Session
 
-function Session:__call(arg)
-    if type(arg) == 'function' then
-        local fun = arg
+local notify = Session.notify
+local request = Session.request
+
+function Session:__index(key)
+    local val = Session[key]
+    if not val then
+        val = function(a1, ...)
+            if select('#', ...) > 0 then
+                notify(self, key, {a1, ...})
+            else
+                notify(self, key, a1)
+            end
+        end
+    end
+    return val
+end
+
+function Session:__call(key, arg, ...)
+    if type(key) == 'function' then
+        local fun = key
         local ups = {string.dump(fun)}
         for i = 2, 100 do
             local n, v = debug.getupvalue(fun, i)
             if not n then break end
             table.insert(ups, v)
         end
-        self:notify('@call', ups)
+        local foo = arg and request or notify
+        return foo(self, '@call', ups)
+    end
+    if select('#', ...) > 0 then
+        return notify(self, key, {arg, ...})
+    else
+        return notify(self, key, arg)
     end
 end
 

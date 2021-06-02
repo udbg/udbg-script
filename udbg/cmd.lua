@@ -188,8 +188,10 @@ function cmd.find(name, prefix)
     -- try load from file
     if not result then
         main, parser = cmd.load(modpath)
-        result = {main = main, parser = parser, name = name}
-        cache[name] = result
+        if main then
+            result = {main = main, parser = parser, name = name}
+            cache[name] = result
+        end
     end
 
     return result
