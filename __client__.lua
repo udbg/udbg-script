@@ -153,6 +153,10 @@ do
     end)
 
     ucmd.register('.exec', function(argv) execute_bin(argv[1]) end)
+
+    ucmd.register('.show', function(argv)
+        os.execute('explorer.exe /select,"' .. argv[1] .. '"')
+    end)
 end
 
 do  -- rpc service function

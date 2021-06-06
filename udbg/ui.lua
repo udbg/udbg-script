@@ -548,6 +548,13 @@ local Widget = {} do
         return register_ctrl(opt, 'button')
     end
 
+    ---create a QProgressBar
+    ---@param opt CtrlOpt
+    ---@return Widget
+    function ui.progress(opt)
+        return register_ctrl(opt, 'progress')
+    end
+
     ---create a QRadioButton
     ---@param opt CtrlOpt
     ---@return Widget

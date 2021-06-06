@@ -38,7 +38,7 @@ local function attach(line, open)
     }
 end
 
-local windows = __llua_os == 'windows'
+local windows = os.name == 'windows'
 local function update_thread_list(view_thread)
     local data = {}
     for tid, t in pairs(thread_list()) do
@@ -362,20 +362,31 @@ end)
 function event.on.target_success()
     local target = udbg.target
     local image_base = target.image_base or 0
-    local m
+
     if image_base == 0 then
-        m = enum_module()()
+        local m = target.enum_module()()
         image_base = m and m.base or 0
+        target.image = m
     else
-        m = get_module(image_base)
+        target.image = target.get_module(image_base)
     end
     ui.goto_mem(image_base)
-    if m then
-        ui.goto_cpu(m.entry_point)
+    if target.image then
+        ui.goto_cpu(target.image.entry_point)
     end
 
     ui.g_status:set('text', target.status:gsub('^.', string.upper))
     ui.load_target_data()
+end
+
+function event.on.process_create()
+    local target = udbg.target
+    if not target.image then
+        target.image = target.get_module(target.image_base)
+        if target.image then
+            ui.goto_cpu(target.image.entry_point)
+        end
+    end
 end
 
 function event.on.target_failure(err)

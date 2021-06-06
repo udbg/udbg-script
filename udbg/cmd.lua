@@ -199,18 +199,24 @@ end
 
 local function table_outer(name)
     local tbl = ui.table {}
+    local progress = ui.progress {name = 'progress', value = 0}
     local outer = {icol = 0, line = 0, tbl = tbl}
 
     ui.dialog {
         title = name, size = {0.5, 0.5};
 
         ui.vbox {
-            tbl, ui.button {
-                title = '&Refresh', on_click = function()
-                    tbl:set_data {}
-                    outer.docmd()
-                end
-            },
+            tbl,
+
+            ui.hbox {
+                ui.button {
+                    title = '&Refresh', on_click = function()
+                        tbl:set_data {}
+                        outer.docmd()
+                    end
+                },
+                progress,
+            }
         },
     } 'show' 'raise'
 
@@ -251,6 +257,8 @@ local function table_outer(name)
             tbl:set('columnWidths', val)
         elseif key == 'title' then
             tbl:set('columns', val)
+        elseif key == 'progress' then
+            progress.value = val
         else
             rawset(self, key, val)
         end

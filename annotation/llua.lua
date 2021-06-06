@@ -46,6 +46,10 @@ os.path = {}
 ---@return fun():string
 function os.glob(wildcard) end
 
+---get the executing program's path
+---@return string
+function os.getexe() end
+
 function os.getcwd() end
 
 function os.chdir(dir) end
@@ -59,6 +63,21 @@ function os.mkdir(path) end
 function os.rmdir(dir) end
 
 function os.mkdirs(path) end
+
+---get the directory of path
+---@param path string
+---@return string?
+function os.path.dirname(path) end
+
+---detect if a path is exists
+---@param path string
+---@return boolean
+function os.path.exists(path) end
+
+---get the absolute path
+---@param path string
+---@return string
+function os.path.abspath(path) end
 
 function os.path.basename(path) end
 

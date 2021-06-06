@@ -162,7 +162,7 @@ do
         ui.notify('fire_event', {'target-success', {
             pid = target.pid,
             psize = target.psize,
-            os = __llua_os,
+            os = os.name,
             arch = target.arch,
             path = target.path,
             os_psize = __llua_psize
@@ -203,7 +203,7 @@ do
     end
 
     local excp, ignore
-    if __llua_os == 'windows' then
+    if os.name == 'windows' then
         excp = require 'win.const'.exception
         ignore = {
             [excp.STATUS_CPP_EH_EXCEPTION] = true,
@@ -230,7 +230,7 @@ do
         if __config.print_exception ~= false then
             local what, addr
             if second then second = '[second]' end
-            if __llua_os == 'windows' then
+            if os.name == 'windows' then
                 if code == excp.STATUS_ACCESS_VIOLATION or code == excp.STATUS_IN_PAGE_ERROR then
                     local t = {[0] = 'read', [1] = 'write', [8] = 'DEP'}
                     what, addr = udbg.eparam(0), udbg.eparam(1)
