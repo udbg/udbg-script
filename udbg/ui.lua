@@ -243,14 +243,6 @@ do      -- ui utils
         end
         ui_notify(LOG_COLOR, a)
     end
-
-    local SHOW_MSGBOX = 1401
-    -- show a message box and block
-    ---@param title string
-    ---@param text string
-    function ui.msgbox(title, text)
-        ui_request(SHOW_MSGBOX, {tostring(title), tostring(text)})
-    end
 end
 
 ---@class CtrlOpt
