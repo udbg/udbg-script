@@ -9,6 +9,7 @@ end
 
 local cmd = {
     use_cache = true,
+    no_outer = false,
     prefix = 'udbg.command.'
 }
 setmetatable(cmd, cmd)
@@ -162,10 +163,18 @@ function cmd.call_global(cmdline)
     end
 end
 
+---@class Column
+---@field name string
+---@field title string
+---@field width integer
+
 ---@class Command
 ---@field main function
----@field parser string|nil
----@field registered boolean|nil
+---@field name string
+---@field parser string?
+---@field registered boolean?
+---@field menu CtrlOpt[] @right-click menu
+---@field column Column[]|string[]
 
 -- find specific command
 ---@type table<string, Command>
@@ -188,7 +197,9 @@ function cmd.find(name, prefix)
     -- try load from file
     if not result then
         main, parser = cmd.load(modpath)
-        if main then
+        if type(main) == 'table' then
+            result = main
+        elseif main then
             result = {main = main, parser = parser, name = name}
             cache[name] = result
         end
@@ -197,7 +208,7 @@ function cmd.find(name, prefix)
     return result
 end
 
-local function table_outer(name)
+local function table_outer(name, command)
     local tbl = ui.table {}
     local progress = ui.progress {name = 'progress', value = 0}
     local outer = {icol = 0, line = 0, tbl = tbl}
@@ -238,6 +249,13 @@ local function table_outer(name)
             ui.goto_page(tbl:line('.', '.'):trim())
         end
     }
+    if command.menu then
+        for _, item in ipairs(command.menu) do
+            tbl:add_action(item)
+            item.table = tbl
+            item.outer = outer
+        end
+    end
 
     outer.__index = outer
     outer.__call = function(self, ...)
@@ -316,17 +334,19 @@ function cmd.dispatch(cmdline, prefix)
         log(parser)
     elseif args then
         local outer
-        if outype == 'table' then
-            outer = table_outer(outname)
-        else
-            local filename = ''
-            if outype == 'file' then
-                filename = outname
+        if not cmd.no_outer then
+            if outype == 'table' then
+                outer = table_outer(outname, command)
+            else
+                local filename = ''
+                if outype == 'file' then
+                    filename = outname
+                end
+                outer = require'udbg.uix'.Data.new(filename)
             end
-            outer = require'udbg.uix'.Data.new(filename)
         end
         -- outer.filter = filter
-        outer.lua_filter = filter
+        if outer then outer.lua_filter = filter end
         local function docmd() main(args, outer) end
         if task then
             function docmd()
@@ -335,14 +355,14 @@ function cmd.dispatch(cmdline, prefix)
                 end, {name = cmdline})
             end
         end
-        outer.docmd = docmd
+        if outer then outer.docmd = docmd end
         docmd()
     end
 end
 
 function cmd.register(name, a1, a2)
-    local parser, main
-    if a2 then parser, main = a1, a2
+    local main, parser
+    if a2 then main, parser = a1, a2
     else main = a1 end
 
     assert(type(main) == 'function')

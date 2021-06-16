@@ -56,7 +56,7 @@ local function output(fmt, arr, show_op)
 
         if show_op then
             for i = 0, 10 do
-                local op, a1, a2, a3, a4, a5 = d(0, 'operand', i)
+                local op, a1, a2, a3, a4, a5 = d('operand', i)
                 if not op then break end
                 log('   ', op, a1, a2, a3, a4, a5)
             end
