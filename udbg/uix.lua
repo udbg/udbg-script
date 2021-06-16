@@ -3,14 +3,14 @@ local ui = require 'udbg.ui'
 
 local Data = {} ui.Data = Data
 do      -- data
-    local DATA_NEW = 1300
-    local DATA_PUSH = 1301
-    local DATA_COLOR = 1302
-    local DATA_WIDTH = 1303
-    local DATA_FLUSH = 1304
-    local DATA_CLOSE = 1305
-    local DATA_FILTER = 1306
-    local DATA_STATE = 1307
+    local DATA_NEW = 1010
+    local DATA_PUSH = 1011
+    local DATA_COLOR = 1012
+    local DATA_WIDTH = 1013
+    local DATA_FLUSH = 1014
+    local DATA_CLOSE = 1015
+    local DATA_FILTER = 1016
+    local DATA_STATE = 1017
 
     function Data.new(name)
         local key = ui_request(DATA_NEW, name or '')

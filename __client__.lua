@@ -92,9 +92,9 @@ do  -- load config/client.lua, init the plugin_dirs and package.path
     package.path = table.concat(lua_paths, ';') .. ';' .. origin_paths
 end
 
-local function find_lua(name)
+local function find_lua(...)
     for _, dir in ipairs(plugin_dirs) do
-        local p = path.join(dir, name)
+        local p = path.join(dir, ...)
         if path.isfile(p) then
             return p
         end
@@ -111,48 +111,86 @@ local function execute_lua(lua_path, data)
     end
 end
 
-local function execute_bin(lua_path)
+local watch_cache = table {}
+
+local function execute_bin(lua_path, opt)
     if not path.isfile(lua_path) then
-        local p = 'udbg/bin/'..lua_path
-        p = find_lua(p) or find_lua(p .. '.lua') or find_lua(p .. '.luac')
+        local p = lua_path
+        p = find_lua('udbg', 'bin', p) or
+            find_lua('udbg', 'bin', p .. '.lua') or
+            find_lua('udbg', 'bin', p .. '.luac')
         if not p then
             ui.warn(lua_path, 'not found')
         else
             lua_path = p
         end
     end
+
+    local function edit_script()
+        os.execute(config.edit_cmd:gsub('%%1', lua_path))
+    end
     if lua_path and path.isfile(lua_path) then
+        if opt.edit then
+            edit_script()
+            return lua_path
+        end
+        if opt.watch then
+            local abspath = path.abspath(lua_path)
+            local key = abspath
+            if os.name == 'windows' then
+                key = abspath:lower()
+            end
+            if not watch_cache[key] then
+                watch_cache:insert(lua_path)
+                watch_cache[key] = #watch_cache
+                log('[watching]', lua_path, abspath)
+                client:watch(lua_path)
+            end
+        end
         execute_lua(lua_path)
         return lua_path
+    elseif opt.edit then
+        -- try create this file
+        if not path.isabs(lua_path) then
+            local dir = path.isdir(config_dir) and config_dir or script_dir
+            lua_path = path.withext(path.join(dir, 'bin', lua_path), 'lua')
+        end
+        if not path.exists(lua_path) then
+            writefile(lua_path, '')
+        end
+        edit_script()
     end
 end
 
 local ucmd = require 'udbg.cmd'
 do
     ucmd.prefix = 'udbg.client.cmd.'
+    ucmd.no_outer = true
 
     function ucmd.load(modpath)
     end
 
-    ucmd.register('.edit', function(argv)
-        local p = assert(argv[1], 'no file')
-        local script_path
-        if not path.isabs(p) then
-            if not path.isfile(p) then
-                script_path = find_lua('autorun/'..p) or find_lua('autorun/'..p..'.lua') or find_lua('autorun/'..p..'.client.lua')
-            end
-            if not script_path then
-                local dir = path.isdir(config_dir) and config_dir or script_dir
-                script_path = path.withext(path.join(dir, 'autorun', p), 'lua')
-                writefile(script_path, '')
-            end
-        end
-        if script_path then
-            os.execute(config.edit_cmd:gsub('%%1', script_path))
-        end
-    end)
+local parser = [[
+.exec                           execute a script
+    <path> (optional string)    the script path
 
-    ucmd.register('.exec', function(argv) execute_bin(argv[1]) end)
+    -w, --watch                 watch the script
+    -e, --edit                  edit this script
+    --list-watch
+]]
+    ucmd.register('.exec', function(argv)
+        if argv.path then
+            execute_bin(argv.path, argv)
+        elseif argv.list_watch then
+            local k = next(watch_cache, #watch_cache)
+            while k do
+                local i = watch_cache[k]
+                log(i, watch_cache[i], k)
+                k = next(watch_cache, k)
+            end
+        end
+    end
+    , parser)
 
     ucmd.register('.show', function(argv)
         os.execute('explorer.exe /select,"' .. argv[1] .. '"')
@@ -217,13 +255,14 @@ do  -- rpc service function
         client:add_history(cmdline)
         log("[cmd] >> ", cmdline)
         if cmdline:sub(1, 1) == '.' then
-            local argv = ucmd.parse(cmdline)
-            local name = table.remove(argv, 1)
-            local cmd = ucmd.find(name)
-            if cmd then
-                cmd.main(argv, ui.log)
-                return
-            end
+            -- local argv = ucmd.parse(cmdline)
+            -- local name = table.remove(argv, 1)
+            -- local cmd = ucmd.find(name)
+            -- if cmd then
+            --     cmd.main(argv, ui.log)
+            --     return
+            -- end
+            ucmd.dispatch(cmdline)
         end
         g_session:notify('execute_cmd', cmdline)
     end
@@ -346,10 +385,10 @@ do  -- start session
 
     -- execute lua for shell-args
     if args.execute then
-        local lua_path = execute_bin(args.execute)
-        if lua_path and args.watch then
-            client:watch(lua_path)
-        end
+        assert(
+            execute_bin(args.execute, {watch = args.watch}),
+            args.execute .. ' not found'
+        )
     end
 
     event.on('execute_cmd', service.execute_cmd)
