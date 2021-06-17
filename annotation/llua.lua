@@ -142,3 +142,17 @@ function string.to_utf16(utf8) end
 ---@param utf16 string @utf16 encoding
 ---@return string @utf8 encoding
 function string.from_utf16(utf16) end
+
+---compare two strings with optional case_sensitive
+---@param t1 string
+---@param t2 string
+---@param case_sensitive? boolean @default is false
+---@return boolean
+function string.equal(t1, t2, case_sensitive) end
+
+---if s matches the wildcard
+---@param s string
+---@param pattern string @the wildcard string
+---@param case_sensitive? boolean @default is false
+---@return boolean
+function string.wildmatch(s, pattern, case_sensitive) end

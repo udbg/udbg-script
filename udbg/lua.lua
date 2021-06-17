@@ -177,3 +177,12 @@ end
 function eval(expr, opt)
     return assert(Eval(expr, opt))()
 end
+
+function int(n, base)
+    if base == 16 then
+        if type(n) == 'string' then
+            n = n:gsub('^%s*0[Xx]', '')
+        end
+    end
+    return tonumber(n, base)
+end
