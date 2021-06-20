@@ -189,11 +189,15 @@ local parser = [[
                 k = next(watch_cache, k)
             end
         end
-    end
-    , parser)
+    end, parser)
 
     ucmd.register('.show', function(argv)
         os.execute('explorer.exe /select,"' .. argv[1] .. '"')
+    end)
+
+    ucmd.register('.edit', function(argv)
+        local path = assert(argv[1], 'no path')
+        os.execute(config.edit_cmd:gsub('%%1', path))
     end)
 end
 
@@ -255,14 +259,8 @@ do  -- rpc service function
         client:add_history(cmdline)
         log("[cmd] >> ", cmdline)
         if cmdline:sub(1, 1) == '.' then
-            -- local argv = ucmd.parse(cmdline)
-            -- local name = table.remove(argv, 1)
-            -- local cmd = ucmd.find(name)
-            -- if cmd then
-            --     cmd.main(argv, ui.log)
-            --     return
-            -- end
             ucmd.dispatch(cmdline)
+            return
         end
         g_session:notify('execute_cmd', cmdline)
     end

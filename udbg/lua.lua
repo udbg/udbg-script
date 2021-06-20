@@ -39,6 +39,24 @@ do -------- Extend table --------
         return origin
     end
 
+    function table:reverse()
+        for i = 1, #self//2 do
+            local r = #self + 1 - i
+            self[r], self[i] = self[i], self[r]
+        end
+        return self
+    end
+
+    function table:search_item(k, v)
+        if self[k] == v then return self end
+        for _, t in pairs(self) do
+            if type(t) == 'table' then
+                local res = table.search_item(t, k, v)
+                if res then return res end
+            end
+        end
+    end
+
     setmetatable(table, {
         __call = function(self, t)
             return setmetatable(t, table)

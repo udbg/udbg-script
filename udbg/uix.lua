@@ -71,8 +71,11 @@ do      -- counter table
         local symbol = opt.symbol
 
         local t = ui.table {
-            column_title = {'count', 'value', 'symbol'},
-            column_width = {8, 30, 100}
+            columns = {
+                {name = 'count', width = 8},
+                {name = 'value', width = 30},
+                {name = 'symbol', width = 100},
+            },
         }
         ui.dialog {title = 'Count: ' .. name, t} 'show' 'raise'
         local count_cache = {}

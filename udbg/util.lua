@@ -177,17 +177,6 @@ do          -- evaluate address
     end
 end
 
-do -------- Extend utf8 ----------
-    local u = {}
-    local to_utf8 = to_utf8
-
-    function u:__call(s)
-        return to_utf8(s)
-    end
-
-    setmetatable(utf8, u)
-end
-
 do -------- Extend global --------
     function searchpath(name, path)
         return package.searchpath(name, path or package.path)
@@ -201,7 +190,7 @@ do -------- Extend global --------
     local addr_fmt, size_fmt
     function fmt_addr(a) return format(addr_fmt, a) end
     function fmt_size(a) return format(size_fmt, a) end
-    function symbolize(a)
+    function fmt_addr_sym(a)
         local sym = get_symbol(a)
         a = fmt_addr(a)
         return sym and a..'('..sym..')' or a

@@ -1,5 +1,7 @@
 
-local parser = [[
+local mod = {}
+
+mod.parser = [[
 dbg                                  -- start a debug session
     <target>     (string)               target pid/name
 
@@ -11,8 +13,10 @@ dbg                                  -- start a debug session
     --cwd (optional string)             set the work directory
 ]]
 
-return function(args)
+function mod.main(args)
     args.create = args.attach
     log(args)
     udbg.start(args)
-end, parser
+end
+
+return mod

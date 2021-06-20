@@ -34,10 +34,13 @@ function enum_module() end
 ---@field tid integer
 ---@field teb integer
 ---@field entry integer
+---@field handle integer
 ---@field error string @last error
 ---@field name string
 ---@field status string
 ---@field priority string
+---@field suspend function(self):integer
+---@field resume function(self):integer
 
 -- get thread list
 ---@return UDbgThread[]

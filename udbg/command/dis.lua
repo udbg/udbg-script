@@ -1,5 +1,7 @@
 
-local parser = [[
+local mod = {}
+
+mod.parser = [[
 dis                          -- disassembly
     <address> (string)          address
     <count>   (default 10)      指令个数
@@ -64,7 +66,7 @@ local function output(fmt, arr, show_op)
     end
 end
 
-return function(args)
+function mod.main(args)
     local address = parse_address(args.address)
     if not address or address == 0 then
         ui.error('invalid address')
@@ -113,4 +115,6 @@ return function(args)
     --     count = count + 1
     --     address = address + #bytes
     -- end
-end, parser
+end
+
+return mod

@@ -1,5 +1,7 @@
 
-local parser = [[
+local mod = {}
+
+mod.parser = [[
 e          Edit Memory
     <address> (string)
     <value>   (string)
@@ -11,7 +13,7 @@ e          Edit Memory
     -s, --string
 ]]
 
-return function(args)
+function mod.main(args)
     local addr = EA(args.address)
     if not addr then return ui.error('Invaild address') end
 
@@ -37,4 +39,6 @@ return function(args)
         value = tonumber(value)
     end
     log(write(addr, value))
-end, parser
+end
+
+return mod

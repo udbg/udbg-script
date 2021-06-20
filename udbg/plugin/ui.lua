@@ -40,20 +40,14 @@ end
 
 local windows = os.name == 'windows'
 local function update_thread_list(view_thread)
-    local data = {}
+    local data = table {}
     for tid, t in pairs(thread_list()) do
         local entry = t.entry
-        local sym = get_symbol(entry)
-        entry = fmt_addr(entry)
-        entry = sym and entry..'('..sym..')' or entry
         if windows then
-            local suspend_count = t 'suspend'
+            local suspend_count = t:suspend()
             local pc = t('reg', '_pc')
-            sym = get_symbol(pc)
-            pc = fmt_addr(pc)
-            pc = sym and pc..'('..sym..')' or pc
-            t 'resume'
-            table.insert(data, {tid, entry, fmt_addr(t.teb), pc, t.status, t.priority, suspend_count, hex(t.error)})
+            t:resume()
+            data:insert {tid, fmt_addr_sym(entry), fmt_addr(t.teb), fmt_addr_sym(pc), t.status, t.priority, suspend_count, hex(t.error)}
         else
         end
     end
@@ -122,50 +116,6 @@ function ui.restart_target()
     end)
 end
 
-function ui.show_attach()
-    local function update_list(self)
-        local view = self:find 'process-list'
-        local data = {}
-        for p in enum_psinfo() do
-            table.insert(data, {p.pid, p.name, p.window, p.path, p.cmdline})
-        end
-        for i = 1, #data//2 do
-            local r = #data + 1 - i
-            data[r], data[i] = data[i], data[r]
-        end
-        view:set_data(data)
-    end
-
-    local dlg = ui.dialog {
-        title = 'Attach', parent = true,
-        minsize = {'half', 'half'},
-
-        ui.table {
-            name = 'process-list',
-            column_title = {'Pid', 'Name', 'Caption', 'Path', 'Cmdline'},
-            column_width = {7, 20, 30, 50, 100},
-
-            on_dblclick = function(self, line)
-                attach(line.data, self:find 'only-open':get 'checked')
-                self._root 'close'
-            end
-        },
-        ui.hbox {
-            ui.checkbox {title = '&Open', name = 'only-open'}, 'stretch',
-            ui.button {title = '&Refresh', on_click = update_list},
-            ui.buttonbox {
-                fixed = 'h', 'ok', 'cancel',
-                on_accept = function(self)
-                    attach(self:find'process-list':line '.', self:find 'only-open':get 'checked')
-                    self._root 'close'
-                end,
-            },
-        }
-    } 'raise'
-    update_list(dlg)
-    dlg:call 'exec'
-end
-
 function event.on.ui_inited()
     ui.view_module, ui.view_pages, ui.view_thread,
     ui.view_handle, ui.view_mem,
@@ -216,20 +166,20 @@ function event.on.ui_inited()
         end
         view_thread:add_action '&Suspend'.on_trigger = function()
             local tid = tonumber(view_thread:line('.', 0))
-            open_thread(tid) 'suspend'
+            open_thread(tid):suspend()
         end
         view_thread:add_action '&Resume'.on_trigger = function()
             local tid = tonumber(view_thread:line('.', 0))
-            open_thread(tid) 'resume'
+            open_thread(tid):resume()
         end
         ucmd.register('stack', function(args)
             local function echo(tid, th)
                 if th then
-                    th 'suspend'
+                    th:suspend()
                     local sp = hex(th('reg', '_sp'))
                     log('[stack] ' .. tid .. ' sp: ' .. sp)
                     ucmd('dp -r ' .. sp .. ' 30')
-                    th 'resume'
+                    th:resume()
                 end
             end
             local tid = args[1]
@@ -252,7 +202,7 @@ function event.on.ui_inited()
             'actionAttach', 'actionDetach', 'actionPause', 'actionStop', 'actionRestart'
         }
     )
-    actionAttach.on_trigger = ui.show_attach
+    actionAttach.on_trigger = ucmd.wrap('list-process')
     actionDetach.on_trigger = ui.detach_target
     actionStop.on_trigger = ui.stop_target
     actionPause.on_trigger = udbg.pause

@@ -6,3 +6,11 @@ function uevent.on.ui_inited()
         ucmd('close-handle ' .. h)
     end}
 end
+
+function assert_win32(b, err, ...)
+    if not b and err then
+        local text, code = get_last_error()
+        err = err .. ': ' .. code .. '(' .. text .. ')'
+    end
+    return assert(b, err, ...)
+end

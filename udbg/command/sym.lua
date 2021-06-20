@@ -1,5 +1,7 @@
 
-local parser = [[
+local mod = {}
+
+mod.parser = [[
 sym                          -- show module symbols
     <name> (string)             module name
     <filter> (optional string)  symbol filter
@@ -30,7 +32,7 @@ local function show(m, filter, task, out)
     end
 end
 
-return function(args, out)
+function mod.main(args, out)
     showlen = args.len
     showuname = args.uname
     require 'udbg.task'.spawn(function(task)
@@ -49,4 +51,6 @@ return function(args, out)
             show(m, args.filter, task, out)
         end
     end)
-end, parser
+end
+
+return mod

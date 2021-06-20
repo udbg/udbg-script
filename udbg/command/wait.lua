@@ -1,5 +1,7 @@
 
-local parser = [[
+local mod = {}
+
+mod.parser = [[
 wait                         -- wait target and attach
     <filter> (string)           name filter
 
@@ -7,7 +9,7 @@ wait                         -- wait target and attach
     -w, --window                filter by window name
 ]]
 
-return function(args)
+function mod.main(args)
     local filter = args.filter
     local attr = 'name'
     if args.cmdline then attr = 'cmdline' end
@@ -25,4 +27,6 @@ return function(args)
             end
         end
     end, {name = 'wait: ' .. filter, interval = 100})
-end, parser
+end
+
+return mod

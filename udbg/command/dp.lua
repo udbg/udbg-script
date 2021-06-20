@@ -1,5 +1,7 @@
 
-local parser = [[
+local mod = {}
+
+mod.parser = [[
 dp                           -- display pointer
     <start> (default '_sp')     start address
     <count...> (optional number)   count of each level item to show
@@ -9,7 +11,7 @@ dp                           -- display pointer
     -i, --info                  has info
 ]]
 
-return function(args, out)
+function mod.main(args, out)
     local start = EA(args.start)
     local psize = udbg.target and udbg.target.psize or __llua_psize
     local counts = args.count
@@ -93,4 +95,6 @@ return function(args, out)
         end
     end
     display(result, 1)
-end, parser
+end
+
+return mod

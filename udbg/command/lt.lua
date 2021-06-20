@@ -13,7 +13,7 @@ return function(args, out)
         entry = sym and entry..'('..sym..')' or entry
         if windows then
             local suspend_count, last_eror = 0, 0
-            suspend_count = t 'suspend' t 'resume'
+            suspend_count = t:suspend() t:resume()
             last_eror = t.error
             out(tostring(tid), entry, fmt_addr(t.teb), t.status, t.priority, suspend_count, hex(last_eror))
         else

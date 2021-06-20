@@ -235,7 +235,7 @@ do
                     local t = {[0] = 'read', [1] = 'write', [8] = 'DEP'}
                     what, addr = udbg.eparam(0), udbg.eparam(1)
                     what = '[' .. (t[what] or hex(what)) .. ']'
-                    addr = symbolize(addr)
+                    addr = fmt_addr_sym(addr)
                 end
             end
             ui.warn('[exception]~' .. tid, hex(reg._pc), desc, second, what, addr)

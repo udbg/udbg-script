@@ -287,7 +287,7 @@ local Widget = {} do
     local ADD_ACTION = 1801
 
     local function check_size(opt, key)
-        local size = opt[key]
+        local size = rawget(opt, key)
         if size then
             if type(size) == 'number' then
                 size = {size, size}
@@ -325,7 +325,7 @@ local Widget = {} do
 
     local function set_childs(opt)
         if not opt.childs then
-            local childs = {unpack(opt)}
+            local childs = table {unpack(opt)}
             for i = #opt, 1, -1 do
                 table.remove(opt, i)
             end
@@ -444,6 +444,9 @@ local Widget = {} do
         if type(ctrl_id) == 'number' then
             opt._ctrl_id = ctrl_id
             qobj_map[ctrl_id] = opt
+            if self._root then
+                handle_root(self._root, {opt._data_id, ctrl_id})
+            end
         end
         return opt
     end

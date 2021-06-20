@@ -1,9 +1,11 @@
 
+local mod = {}
+
 require('pl.lapp').add_type('bp_type', function(s)
     return assert(string.match(s, '[ewap][1248]'))
 end)
 
-local parser = [[
+mod.parser = [[
 bp                                        设置断点
     <address>       (string)              断点地址
     <vars...>       (optional string)     变量列表
@@ -93,7 +95,7 @@ local cmd = function(args)
     log('add_bp', hex(bpid))
 end
 
-return function(args)
+function mod.main(args)
     if args.module then
         if not on_module_bp then
             MODULE_BPLIST = {}
@@ -117,4 +119,6 @@ return function(args)
     else
         return cmd(args)
     end
-end, parser
+end
+
+return mod

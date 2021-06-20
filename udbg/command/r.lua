@@ -1,5 +1,7 @@
 
-local parser = [[
+local mod = {}
+
+mod.parser = [[
 r                            -- read/write register
     <reg>   (optional string)   register
     <value> (optional string)   set value
@@ -23,7 +25,7 @@ local function show(k)
     log ''
 end
 
-return function(args)
+function mod.main(args)
     if args.reg then
         local k = args.reg
         if args.value then
@@ -34,4 +36,6 @@ return function(args)
         local regs = regs[__llua_arch]
         for _, k in ipairs(regs) do show(k) end
     end
-end, parser
+end
+
+return mod

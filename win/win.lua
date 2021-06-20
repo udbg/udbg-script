@@ -55,6 +55,27 @@ function mod.is_visible(hwnd)
     return api.IsWindowVisible(hwnd) > 0
 end
 
+local SW = {
+    HIDE            = 0,
+    SHOWNORMAL      = 1,
+    NORMAL          = 1,
+    SHOWMINIMIZED   = 2,
+    SHOWMAXIMIZED   = 3,
+    MAXIMIZE        = 3,
+    SHOWNOACTIVATE  = 4,
+    SHOW            = 5,
+    MINIMIZE        = 6,
+    SHOWMINNOACTIVE = 7,
+    SHOWNA          = 8,
+    RESTORE         = 9,
+    SHOWDEFAULT     = 10,
+    FORCEMINIMIZE   = 11,
+    MAX             = 11,
+}
+function mod.show_window(hwnd, what)
+    return api.ShowWindow(hwnd, SW[what] or SW.SHOW) ~= 0
+end
+
 function mod.close(hwnd)
     local WM_QUIT = 0x0012
     local WM_CLOSE = 0x10

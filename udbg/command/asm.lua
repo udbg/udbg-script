@@ -1,5 +1,7 @@
 
-local parser = [[
+local mod = {}
+
+mod.parser = [[
 asm                          -- assembly a instruction
     <insn>     (string)         the instruction
     <address> (default '')      the address
@@ -11,7 +13,7 @@ asm                          -- assembly a instruction
 if not ASM_REVERT then ASM_REVERT = {} end
 local revert = ASM_REVERT
 
-return function(args)
+function mod.main(args)
     if args.address == '' then
         args.address = 0x1000
     else
@@ -33,4 +35,6 @@ return function(args)
         revert[args.address] = read_bytes(args.address, #data)
         log('[asm] write:', write_bytes(args.address, data))
     end
-end, parser
+end
+
+return mod

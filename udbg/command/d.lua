@@ -1,5 +1,7 @@
 
-local parser = [[
+local mod = {}
+
+mod.parser = [[
 d                           Display Memory
     <address> (string)      内存地址
     <linecount> (default 8) 显示行数
@@ -9,7 +11,7 @@ d                           Display Memory
     -q, --qword
 ]]
 
-return function(args)
+function mod.main(args)
     local addr = EA(args.address)
     if not addr then return log('Invaild address') end
 
@@ -41,4 +43,6 @@ return function(args)
         end)
         logc('yellow', text .. '\n')
     end
-end, parser
+end
+
+return mod

@@ -1,7 +1,16 @@
 
+local mod = {
+    column = {
+        {name = 'HWND', width = 8},
+        {name = 'pid-tid', width = 15},
+        {name = 'class', width = 20},
+        {name = 'title', width = 30},
+    }
+}
+
 local win = require 'win.win'
 
-local parser = [[
+mod.parser = [[
 list-window
     <class>     (optional string)
 
@@ -9,18 +18,32 @@ list-window
     -a, --all
 ]]
 
-return function(args, out)
-    out.title = {'HWND:8', 'pid-tid:15', 'class:20', 'title:30'}
+local function on_close(obj)
+    local hwnd = tonumber(obj:find'table':line('.', 0))
+    win.close(hwnd)
+end
+
+local function on_show(obj)
+    local hwnd = tonumber(obj:find'table':line('.', 0))
+    win.show_window(hwnd, 'SHOW')
+end
+
+local function on_hide(obj)
+    local hwnd = tonumber(obj:find'table':line('.', 0))
+    win.show_window(hwnd, 'HIDE')
+end
+
+function mod.on_view(vbox)
+    local hbox = table.search_item(vbox, 'name', 'bottom_hbox')
+    hbox.childs:insert(2, ui.hbox {
+        ui.button {title = '&Close', on_click = on_close},
+        ui.button {title = '&Show', on_click = on_show},
+        ui.button {title = '&Hide', on_click = on_hide},
+    })
+end
+
+function mod.main(args, out)
     local tbl = out.tbl
-    if tbl then
-        tbl:add_action {
-            title = 'Close &Window',
-            on_trigger = function(self)
-                local hwnd = tonumber(tbl:line('.', 0))
-                win.close(hwnd)
-            end
-        }
-    end
 
     if not args.all and udbg.target then
         args.pid = udbg.target.pid
@@ -40,4 +63,6 @@ return function(args, out)
             end
         end
     end
-end, parser
+end
+
+return mod

@@ -86,11 +86,11 @@ function cmd.parse(cmdline, parse_number)
     return r, filter, outype, name
 end
 
-function cmd.load(modpath)
-    local path = package.searchpath(modpath, package.path)
-    if path then
-        return assert(loadfile(path))()
+function cmd.load(modpath, reload)
+    if reload then
+        package.loaded[modpath] = nil
     end
+    return require(modpath)
 end
 
 local Filter = {} do
@@ -172,6 +172,7 @@ end
 ---@field main function
 ---@field name string
 ---@field parser string?
+---@field view_type string?
 ---@field registered boolean?
 ---@field menu CtrlOpt[] @right-click menu
 ---@field column Column[]|string[]
@@ -185,23 +186,15 @@ local cache = {} cmd.cache = cache
 ---@param prefix? string
 ---@return Command?
 function cmd.find(name, prefix)
-    prefix = prefix or cmd.prefix
-    local modpath = prefix .. name
-
-    -- try load from cache
+    -- try load from cache(cmd.register(...))
     local result = cache[name]
-    if not cmd.use_cache and result and not result.registered then
-        result = nil
-    end
-
     -- try load from file
     if not result then
-        main, parser = cmd.load(modpath)
-        if type(main) == 'table' then
-            result = main
-        elseif main then
-            result = {main = main, parser = parser, name = name}
-            cache[name] = result
+        prefix = prefix or cmd.prefix
+        local modpath = prefix .. name
+        result = cmd.load(modpath, not cmd.use_cache)
+        if type(result) == 'function' then
+            result = {main = result, name = name}
         end
     end
 
@@ -209,28 +202,27 @@ function cmd.find(name, prefix)
 end
 
 local function table_outer(name, command)
-    local tbl = ui.table {}
-    local progress = ui.progress {name = 'progress', value = 0}
+    local tbl = ui.table {name = 'table', columns = command.column}
     local outer = {icol = 0, line = 0, tbl = tbl}
+    local progress = ui.progress {name = 'progress', value = 0}
+    local vbox = ui.vbox {
+        tbl, ui.hbox {
+            name = 'bottom_hbox',
+            ui.button {
+                title = '&Refresh', on_click = function()
+                    tbl:set_data {}
+                    outer.docmd()
+                end
+            },
+            progress,
+        }
+    }
 
-    ui.dialog {
-        title = name, size = {0.5, 0.5};
+    if command.on_view then
+        command.on_view(vbox)
+    end
 
-        ui.vbox {
-            tbl,
-
-            ui.hbox {
-                ui.button {
-                    title = '&Refresh', on_click = function()
-                        tbl:set_data {}
-                        outer.docmd()
-                    end
-                },
-                progress,
-            }
-        },
-    } 'show' 'raise'
-
+    ui.dialog {title = name, size = {0.5, 0.5}; vbox} 'show' 'raise'
     tbl:add_action {
         title = 'Goto &CPU',
         on_trigger = function()
@@ -308,8 +300,10 @@ function cmd.dispatch(cmdline, prefix)
     end
     local name = table.remove(argv, 1)  -- command name
     local command = cmd.find(name, prefix)
-    if not command then
-        error 'command not found'
+    assert(command, 'command not found')
+
+    if command.view_type then
+        outype = command.view_type
     end
 
     -- parse cmdline

@@ -29,12 +29,3 @@ uevent.error = ui.error
 
 require 'udbg.util'
 require 'udbg.alias'
-
-local loadremote = __loadremote
-function ucmd.load(modpath)
-    -- try load from remote client
-    local path, data = loadremote(modpath)
-    if data then
-        return assert(load(data, path))()
-    end
-end
