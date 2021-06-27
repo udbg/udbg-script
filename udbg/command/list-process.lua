@@ -62,7 +62,7 @@ function mod.main(args, out)
             data:insert(item)
         end
     end
-    out.tbl:set_data(data:reverse())
+    out.tbl:set('data', data:reverse())
 end
 
 return mod

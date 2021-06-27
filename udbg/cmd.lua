@@ -87,10 +87,21 @@ function cmd.parse(cmdline, parse_number)
 end
 
 function cmd.load(modpath, reload)
-    if reload then
-        package.loaded[modpath] = nil
+    local result = package.loaded[modpath]
+    if reload then result = nil end
+
+    if result then return result end
+    for _, searcher in ipairs(package.searchers) do
+        local loader = searcher(modpath)
+        if type(loader) == 'function' then
+            local ok, res = xpcall(loader, debug.traceback)
+            if ok then
+                package.loaded[modpath] = res
+                return res
+            end
+            ui.error(res)
+        end
     end
-    return require(modpath)
 end
 
 local Filter = {} do
@@ -210,7 +221,7 @@ local function table_outer(name, command)
             name = 'bottom_hbox',
             ui.button {
                 title = '&Refresh', on_click = function()
-                    tbl:set_data {}
+                    tbl 'clear'
                     outer.docmd()
                 end
             },

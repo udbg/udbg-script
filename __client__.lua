@@ -30,6 +30,7 @@ verbose('[root_dir]', root_dir)
 verbose('[args]', pretty ^ args)
 
 local config = {
+    precompile = true,
     data_dir = false,
     plugins = {},
     remote_map = {},
@@ -219,7 +220,14 @@ do  -- rpc service function
         end
         if lua_path then
             verbose('[require]', lua_path)
-            return {lua_path, readfile(lua_path)}
+            local res = readfile(lua_path)
+            local size = #res
+            if config.precompile and size > 2048 then
+                res = assert(load(res, lua_path))
+                res = string.dump(res)
+                verbose('save the size:', (size - #res) / 1024)
+            end
+            return {lua_path, res}
         else
             verbose('[require failed]', name)
         end

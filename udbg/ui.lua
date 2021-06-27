@@ -337,7 +337,7 @@ local Widget = {} do
         if not root.childs then
             root.childs = {}
         end
-        for i = 1, #data2ctrl, 2 do
+        for i = 1, #data2ctrl, 3 do
             local data_id, ctrl_id = data2ctrl[i], data2ctrl[i+1]
             -- log(data_id, '->', ctrl_id)
             local data = data_map[data_id]
@@ -346,6 +346,7 @@ local Widget = {} do
                 rawset(data, 'value', nil)
                 rawset(data, 'title', nil)
                 rawset(data, '_root', root)
+                rawset(data, '_class', data2ctrl[i+2])
 
                 qobj_map[ctrl_id] = data
                 if data.name then
@@ -355,11 +356,6 @@ local Widget = {} do
         end
     end
 
-    local GET_ATTR = {
-        metadata = OBJECT_METADATA,
-        methods = OBJECT_METHODS,
-        properties = OBJECT_PROPERTIES,
-    }
     local PROPERTY = {
         icon = 'icon',
         focus = 'focus',
@@ -370,14 +366,49 @@ local Widget = {} do
         style = 'styleSheet',
     }
 
+    local class = {} ui.class = class
+    class.__index = class
+    setmetatable(class, class)
+
+    local function handle_class_info(info)
+        for i, method in ipairs(info.methods) do
+            method.index = i - 1
+            info.methods[method.name] = method
+        end
+        for i, prop in ipairs(info.properties) do
+            prop.index = i - 1
+            info.properties[prop.name] = prop
+        end
+        return info
+    end
+
+    function class:__index(name)
+        local CLASS_INFO = 1630
+        local info = ui_request(CLASS_INFO, name or '')
+        if info then
+            class[name] = handle_class_info(info)
+        end
+        return info
+    end
+
     local function WidgetGet(self, key)
-        local attr = PROPERTY[key] or GET_ATTR[key]
+        local attr = PROPERTY[key]
         if attr then
             if type(attr) == 'number' then
                 return ui_request(attr, self._ctrl_id)
             else
                 return self:get(attr)
             end
+        elseif key == 'metadata' then
+            local info = rawget(class, self._class)
+            if not info then
+                info = ui_request(OBJECT_METADATA, self._ctrl_id)
+                if info then
+                    class[self._class] = handle_class_info(info)
+                end
+            end
+            rawset(self, 'metadata', info)
+            return info
         end
     end
 
@@ -391,7 +422,7 @@ local Widget = {} do
             end
         end
         if key:find '^on_' then
-            ui_notify(WIDGET_SET_CALLBACK, {self._ctrl_id, key})
+            ui_notify(WIDGET_SET_CALLBACK, {self._ctrl_id, {[key] = true}})
         end
         rawset(self, key, val)
     end
@@ -428,6 +459,14 @@ local Widget = {} do
         return self
     end
 
+    function Widget:on(signal, callback)
+        if not rawget(self, signal) then
+            ui_notify(WIDGET_SET_CALLBACK, {self._ctrl_id, {[signal] = true}})
+            rawset(self, signal, callback)
+        end
+        return self
+    end
+
     function Widget:add_menu(opt)
         local data2ctrl = ui_request(ADD_MENU, {self._ctrl_id, ui.menu(opt)})
         handle_root(self, data2ctrl)
@@ -445,7 +484,7 @@ local Widget = {} do
             opt._ctrl_id = ctrl_id
             qobj_map[ctrl_id] = opt
             if self._root then
-                handle_root(self._root, {opt._data_id, ctrl_id})
+                handle_root(self._root, {opt._data_id, ctrl_id, 'QAction'})
             end
         end
         return opt
@@ -463,13 +502,16 @@ local Widget = {} do
     ---@return Widget?
     function Widget:find_child(name)
         local id = ui_request(WIDGET_FIND_CHILD, {self._ctrl_id, name or ''})
+        local res = table {}
         if type(id) == 'table' then
-            for i, ID in ipairs(id) do
-                id[i] = register_ctrl({_ctrl_id = ID})
+            for i = 1, #id, 2 do
+                if id[i] then
+                    res:insert(register_ctrl({_ctrl_id = id[i], _class = id[i+1]}))
+                else
+                    res:insert(false)
+                end
             end
-            return id
-        else
-            return register_ctrl({_ctrl_id = id})
+            return res:unpack()
         end
     end
 
@@ -490,43 +532,30 @@ local Widget = {} do
     local TABLE_GET = 1101
     local TABLE_SET = 1102
     local TABLE_APPEND = 1103
-    local TABLE_SET_WIDTH = 1104
-    local TABLE_SET_TITLE = 1105
+    ui.APPEND = 1103
     local TABLE_SET_COLOR = 1106
-
-    ---set the table's content
-    ---@param data string[][]
-    function Widget:set_data(data)
-        ui_notify(TABLE_SET, {self._ctrl_id, 'all', data or {}})
-    end
-
-    ---get the table's content
-    ---@return string[][]
-    function Widget:data()
-        return ui_request(TABLE_GET, {self._ctrl_id, 'all'})
-    end
 
     ---get specific line data
     ---@param l integer|"'.'" @line number, '.' means the selected line
     ---@param c integer @column number, -1 means the last column
     ---@return string|nil
     function Widget:line(l, c)
-        return ui_request(TABLE_GET, {self._ctrl_id, l or '.', c or -1})
+        return ui_request(OBJECT_INVOKE, {self._ctrl_id, TABLE_GET, l or '.', c or -1})
     end
 
     function Widget:set_line(l, c, data)
-        ui_notify(TABLE_SET, {self._ctrl_id, assert(l), c, data})
+        ui_notify(OBJECT_INVOKE, {self._ctrl_id, TABLE_SET, assert(l), c, data})
     end
 
     ---append line
     ---@param line string[]
     function Widget:append(line)
-        ui_notify(TABLE_APPEND, {self._ctrl_id, assert(line)})
+        ui_notify(OBJECT_INVOKE, {self._ctrl_id, TABLE_APPEND, assert(line)})
     end
 
     function Widget:set_color(l, c, fg)
         assert(l and c and fg)
-        ui_notify(TABLE_SET_COLOR, {self._ctrl_id, l, c, color[fg] or 0})
+        ui_notify(OBJECT_INVOKE, {self._ctrl_id, TABLE_SET_COLOR, l, c, color[fg] or 0})
     end
 
     ---create a QLabel
@@ -574,8 +603,15 @@ local Widget = {} do
     ---create a QLineEdit
     ---@param opt CtrlOpt
     ---@return Widget
-    function ui.text(opt)
+    function ui.linetext(opt)
         return register_ctrl(opt, 'text')
+    end
+
+    ---create a QTextEdit
+    ---@param opt CtrlOpt
+    ---@return Widget
+    function ui.textedit(opt)
+        return register_ctrl(opt, 'textedit')
     end
 
     ---create a QDoubleSpinBox/QSpinBox
@@ -601,11 +637,20 @@ local Widget = {} do
         return register_ctrl(opt, 'buttonbox')
     end
 
+    function ui.splitter(opt)
+        set_childs(opt)
+        return register_ctrl(opt, 'split')
+    end
+
     ---create a CommonTable
     ---@param opt CtrlOpt
     ---@return Widget
     function ui.table(opt)
         return register_ctrl(opt, 'table')
+    end
+
+    function ui.tree(opt)
+        return register_ctrl(opt, 'tree')
     end
 
     ---create a QVBoxLayout
@@ -638,6 +683,15 @@ local Widget = {} do
     function ui.form(opt)
         set_childs(opt)
         return register_ctrl(opt, 'form')
+    end
+
+    function ui.tabs(opt)
+        set_childs(opt)
+        return register_ctrl(opt, 'tabs')
+    end
+
+    function ui.editor(opt)
+        return register_ctrl(opt, 'editor')
     end
 
     local NEW_DIALOG = 1500
@@ -719,7 +773,7 @@ local Widget = {} do
         end
     end
 
-    ui.main = register_ctrl {_ctrl_id = 1}
+    ui.main = register_ctrl {_ctrl_id = 1, _class = 'UDbgWindow'}
 end
 
 do      -- io utils

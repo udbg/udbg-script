@@ -210,12 +210,15 @@ do -------- Extend global --------
         return insns and insns[1]
     end
 
-    function enum_disasm(a)
+    function enum_disasm(a, max)
+        local n = max or 1000
         return function()
+            if n == 0 then return end
             local insn = disasm(a)
             if insn then
                 a = a + insn.size
             end
+            n = n - 1
             return insn
         end
     end

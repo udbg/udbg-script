@@ -52,7 +52,7 @@ local function update_thread_list(view_thread)
         end
     end
     table.sort(data, function(a, b) return a[1] < b[1] end)
-    view_thread:set_data(data)
+    view_thread:set('data', data)
 end
 
 local update_thread
@@ -71,7 +71,7 @@ function ui.update_view(what)
                 for m in enum_module() do
                     data:insert {m.name, fmt_addr(m.base), hex(m.size), fmt_addr(m.base + m.entry), m.arch, m.path, m'pdb_path'}
                 end
-                view_module:set_data(data)
+                view_module:set('data', data)
             end
             if to_update.thread then
                 to_update.thread = false
@@ -120,13 +120,12 @@ function event.on.ui_inited()
     ui.view_module, ui.view_pages, ui.view_thread,
     ui.view_handle, ui.view_mem,
     ui.menu_view, ui.menu_option, ui.menu_help,
-    ui.menu_plugin, ui.g_status =
-    table.unpack(ui.main:find_child {
+    ui.menu_plugin, ui.g_status = ui.main:find_child {
         'module', 'memoryLayout', 'thread',
         'handle', 'memory',
         'menuView', 'menuOption', 'menuHelp',
         'menuPlugin', 'status',
-    })
+    }
     ui.view_module:add_action {
         title = '&Dump', on_trigger = function()
             local m = ui.view_module:line('.', 0)
@@ -197,11 +196,9 @@ function event.on.ui_inited()
         end
     end
 
-    local actionAttach, actionDetach, actionPause, actionStop, actionRestart = table.unpack(
-        ui.main:find_child {
-            'actionAttach', 'actionDetach', 'actionPause', 'actionStop', 'actionRestart'
-        }
-    )
+    local actionAttach, actionDetach, actionPause, actionStop, actionRestart = ui.main:find_child {
+        'actionAttach', 'actionDetach', 'actionPause', 'actionStop', 'actionRestart'
+    }
     actionAttach.on_trigger = ucmd.wrap('list-process')
     actionDetach.on_trigger = ui.detach_target
     actionStop.on_trigger = ui.stop_target

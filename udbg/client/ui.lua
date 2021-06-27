@@ -3,13 +3,11 @@ local ui = require 'udbg.ui'
 
 ui.g_status, ui.actionStepIn, ui.actionStepOut, ui.actionRun,
 ui.actionHandled, ui.actionRunToReturn, ui.actionAbout,
-ui.menu_option, ui.menu_plugin = table.unpack(
-    ui.main:find_child {
-        'status', 'actionStepIn', 'actionStepOut', 'actionRun',
-        'actionHandled', 'actionRunToReturn', 'actionAbout',
-        'menuOption', 'menuPlugin',
-    }
-)
+ui.menu_option, ui.menu_plugin = ui.main:find_child {
+    'status', 'actionStepIn', 'actionStepOut', 'actionRun',
+    'actionHandled', 'actionRunToReturn', 'actionAbout',
+    'menuOption', 'menuPlugin',
+}
 ui.menu_option:add_action {
     title = '&Data Folder',
     icon = ':/ico/res/folder-horizontal-open.png',
@@ -41,7 +39,7 @@ ui.actionAbout.on_trigger = function()
     ui.dialog {
         title = 'About', parent = true;
         min_hint = false, max_hint = false;
-        ui.label {title = about:gsub('%$(%w+)', {version = version}), format = 'markdown'},
+        ui.label {title = about:gsub('%$(%w+)', {version = version}), textFormat = 3},
     }:call 'exec'
 end
 

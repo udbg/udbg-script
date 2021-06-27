@@ -29,6 +29,20 @@ function search_binary(data, pat)
     end
 end
 
+function find_binary(opt)
+    local a = assert(opt.address or opt[1])
+    local pattern = assert(opt.pattern or opt[2])
+    local size = opt.size or opt[3] or 0x1000
+
+    local iter = search_binary(read_bytes(a, size), pattern)
+    return function()
+        local offset = iter()
+        if offset then
+            return a + offset
+        end
+    end
+end
+
 function search_memory(opt)
     local pattern = opt.pattern or opt[1]
     if opt.binary then

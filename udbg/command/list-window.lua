@@ -43,8 +43,6 @@ function mod.on_view(vbox)
 end
 
 function mod.main(args, out)
-    local tbl = out.tbl
-
     if not args.all and udbg.target then
         args.pid = udbg.target.pid
     else
@@ -56,10 +54,7 @@ function mod.main(args, out)
         if cls:find(args.class or '') then
             local pid, tid = win.get_pid_tid(w)
             if args.pid and pid == args.pid or args.all then
-                out(hex(w), pid..':'..tid, cls, win.get_text(w))
-                if tbl and not win.is_visible(w) then
-                    tbl:set_color(-1, 0, 'gray')
-                end
+                out(hex(w), pid..':'..tid, cls, {text = win.get_text(w), color = win.is_visible(w) and ui.color.gray})
             end
         end
     end
