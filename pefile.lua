@@ -306,40 +306,60 @@ function PEFile:GetRelocInfo()
     return result
 end
 
-function PEFile:GetExportInfo()
-    if self.export_list then return self.export_list end
-    local export_data = self:GetDataDirectory 'EXPORT'
-    if export_data.VirtualAddress == 0 then return end
-
-    local exp = {} self.export_directory = exp
-    exp.Characteristics,
-    exp.TimeDateStamp,
-    exp.MajorVersion, exp.MinorVersion,
-    exp.Name, exp.Base,
-    exp.NumberOfFunctions, exp.NumberOfNames,
-    exp.AddressOfFunctions, exp.AddressOfNames,
-    exp.AddressOfNameOrdinals = self:Unpack('I4I4I2I2I4I4I4I4I4I4I4', export_data.VirtualAddress)
-
-    local names = exp.AddressOfNames
-    local oridinals = exp.AddressOfNameOrdinals
-    local functions = exp.AddressOfFunctions
-    -- printx(names, oridinals, functions)
-    local base = self:GetBase()
-    local va_name = nil
-    local result = {}
-    for i = 0, exp.NumberOfNames - 1 do
-        local item = {}
-        va_name = self:Unpack('I4', names + i * 4)
-
-        item.Name = self:Unpack('z', va_name)
-        item.Number = self:Unpack('I2', oridinals + i * 2)
-        item.VirtualAddress = self:Unpack('I4', functions + item.Number * 4)
-        if item.VirtualAddress == 0 then break end
-        item.Address = base + item.VirtualAddress
-        table.insert(result, item)
+function PEFile:GetExportDirectory()
+    if not self.export_directory then
+        local export_data = self:GetDataDirectory 'EXPORT'
+        if export_data.VirtualAddress == 0 then return end
+        -- IMAGE_EXPORT_DIRECTORY
+        local exp = {} self.export_directory = exp
+        exp.Characteristics,
+        exp.TimeDateStamp,
+        exp.MajorVersion, exp.MinorVersion,
+        exp.Name, exp.Base,
+        exp.NumberOfFunctions, exp.NumberOfNames,
+        exp.AddressOfFunctions, exp.AddressOfNames,
+        exp.AddressOfNameOrdinals = self:Unpack('I4I4I2I2I4I4I4I4I4I4I4', export_data.VirtualAddress)
     end
-    self.export_list = result
-    return result
+    return self.export_directory
+end
+
+function PEFile:GetExportInfo(i, exp)
+    if i then
+        exp = exp or self:GetExportDirectory()
+        local item = {}
+        local base = self:GetBase()
+        item.NameRVA = self:Unpack('I4', exp.AddressOfNames + i * 4)
+        item.Name = self:Unpack('z', item.NameRVA)
+        item.Number = self:Unpack('I2', exp.AddressOfNameOrdinals + i * 2)
+        item.VirtualAddress = self:Unpack('I4', exp.AddressOfFunctions + item.Number * 4)
+        item.Address = base + item.VirtualAddress
+        return item
+    else
+        if self.export_list then return self.export_list end
+        local export_data = self:GetDataDirectory 'EXPORT'
+        if export_data.VirtualAddress == 0 then return end
+
+        -- IMAGE_EXPORT_DIRECTORY
+        exp = self:GetExportDirectory()
+        local names = exp.AddressOfNames
+        local oridinals = exp.AddressOfNameOrdinals
+        local functions = exp.AddressOfFunctions
+        -- printx(names, oridinals, functions)
+        local base = self:GetBase()
+        local result = {}
+        for i = 0, exp.NumberOfNames - 1 do
+            local item = {}
+            item.NameRVA = self:Unpack('I4', names + i * 4)
+            item.Name = self:Unpack('z', item.NameRVA)
+            item.Number = self:Unpack('I2', oridinals + i * 2)
+            item.VirtualAddress = self:Unpack('I4', functions + item.Number * 4)
+            if item.VirtualAddress == 0 then break end
+            item.Address = base + item.VirtualAddress
+            table.insert(result, item)
+        end
+        self.export_list = result
+        return result
+    end
 end
 
 function PEFile:GetImportInfo()
@@ -355,39 +375,37 @@ function PEFile:GetImportInfo()
         item.Characteristics,
         item.TimeDateStamp,
         item.ForwarderChain,
-        item.Name, item.FirstThunk,
+        item.NameRVA, item.FirstThunk,
         offset = self:Unpack(imp_fmt, offset)
+        if item.FirstThunk == 0 then break end
 
-        item.Name = self:Unpack('z', item.Name)
+        item.OriginalFirstThunk = item.Characteristics
+        item.Name = self:Unpack('z', item.NameRVA)
         table.insert(result, item)
     end
     return result
 end
 
 function PEFile:EachImportItem(import)
-    local offset = import.Characteristics
+    local offset = import.OriginalFirstThunk
     assert(offset, 'Invaid Import')
 
-    local struct_format = self.IS64 and 'I8I8I8I8' or 'I4I4I4I4'
+    local fmt = self.IS64 and 'I8' or 'I4'
     local original_flag = self.IS64 and 0x8000000000000000 or 0x80000000
 
     return function()
+        local rva
+        rva, offset = self:Unpack(fmt, offset)
+        if rva == 0 then return end
+
         local result = {}
-        result.ForwarderString,
-        result.Function,
-        result.Oridinal,
-        result.AddressOfData,
-        offset = self:Unpack(struct_format, offset)
-
-        if result.Function == 0 then return end
-
-        if result.Function & original_flag > 0 then
+        if rva & original_flag > 0 then
             -- Import by number
-            result.Number = result.Function
+            result.Number = rva & 0x7FFFFFFFFFFFFFFF
         else
             -- Import by function name
-            result.Number = self:Unpack('I2', result.Function)
-            result.Name = self:Unpack('z', result.Function + 2)
+            result.Number = self:Unpack('I2', rva)
+            result.Name = self:Unpack('z', rva + 2)
         end
 
         return result

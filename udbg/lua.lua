@@ -25,6 +25,8 @@ do -------- Extend table --------
     table.foreach = tablex.foreach
     table.foreachi = tablex.foreachi
     table.makeset = tablex.makeset
+    table.new = tablex.new
+    table.set = tablex.set
 
     function table:swap_key_value(update)
         local r = {}
@@ -55,6 +57,14 @@ do -------- Extend table --------
                 if res then return res end
             end
         end
+    end
+
+    function table:unpack_struct(names)
+        local result = {}
+        for i, name in ipairs(names) do
+            result[name] = self[i]
+        end
+        return result
     end
 
     setmetatable(table, {
@@ -122,6 +132,11 @@ do -------- Extend string --------
             end
         end
         return table.concat(t, ' '), ascii and table.concat(s, '') or nil
+    end
+
+    function string.unpack_struct(fmt, s, names, i)
+        local values = {string.unpack(fmt, s, i)}
+        return table.unpack_struct(values, names)
     end
 end
 

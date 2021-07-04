@@ -215,18 +215,12 @@ do      -- ui utils
     function ui.warn(...) ui_notify(WARN, concat(...)) end
     function ui.error(...) ui_notify(ERROR, concat(...)) end
 
-    function ui.logc(...)
-        local args = {...}
-        for i = 1, #args, 2 do
-            local c = color[args[i]]
-            if c then
-                args[i] = c
-            else
-                table.insert(args, i, 0)
-                ui.warn('invalid color', args[i])
-            end
-        end
-        ui_notify(LOG_COLOR, args)
+    local tostring = tostring
+    function ui.logc(c, t, width)
+        ui_notify(LOG_COLOR, {color[c] or c, tostring(t), width})
+    end
+    function ui.log_color_line(line)
+        ui_notify(LOG_COLOR, line)
     end
     function ui.clog(args)
         local sep = args.sep or ' '

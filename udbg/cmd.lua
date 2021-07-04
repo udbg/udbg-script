@@ -296,6 +296,38 @@ local function table_outer(name, command)
     return setmetatable(outer, outer)
 end
 
+local NormalOuter = {}
+setmetatable(NormalOuter, NormalOuter)
+
+local select, tostring = select, tostring
+function NormalOuter:__call(...)
+    local colors = self.color
+    local widths = self.width
+    local black = ui.color.black
+    local type = type
+    local insert = table.insert
+    local line = {}
+    for i = 1, select('#', ...) do
+        local item = select(i, ...)
+        local color = colors and colors[i] or black
+        local width = widths and widths[i] or 0
+        local text = item
+        if type(item) == 'table' then
+            text = item.text or ''
+            color = item.color or color or black
+            width = item.width or 0
+        end
+        if type(color) == 'string' then
+            color = ui.color[color]
+        end
+        insert(line, width << 32 | color)
+        insert(line, tostring(text))
+    end
+    insert(line, 0)
+    insert(line, '\n')
+    ui.log_color_line(line)
+end
+
 ---dispatch command
 ---@param cmdline string|table
 ---@param prefix? string
@@ -343,11 +375,7 @@ function cmd.dispatch(cmdline, prefix)
             if outype == 'table' then
                 outer = table_outer(outname, command)
             else
-                local filename = ''
-                if outype == 'file' then
-                    filename = outname
-                end
-                outer = require'udbg.uix'.Data.new(filename)
+                outer = NormalOuter
             end
         end
         -- outer.filter = filter
