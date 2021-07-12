@@ -52,16 +52,16 @@ function module_callback(name, callback, opt)
 end
 
 local strfmt = string.format
-local get_symbol_ = udbg.get_symbol
+local get_symbol_ = UDbgTarget.get_symbol
 __fnsize = 0x300
 
 ---get symbol by address
 ---@param a integer @address
 ---@param a2 boolean|"'offset'"
 ---@return string
-function get_symbol(a, a2)
+function UDbgTarget:get_symbol(a, a2)
     if a2 == 'offset' then
-        local m, _, _, base = get_symbol_(a, true)
+        local m, _, _, base = get_symbol_(self, a, true)
         local offset = a - base
         if m then
             if offset ~= 0 then
@@ -71,7 +71,7 @@ function get_symbol(a, a2)
             return m
         end
     else
-        return get_symbol_(a, a2 or __fnsize)
+        return get_symbol_(self, a, a2 or __fnsize)
     end
 end
 
@@ -80,12 +80,12 @@ end
 ---@param ret boolean @parse this pointer as a return point
 ---@return string @type of this pointer, 'symbol' 'string' 'wstring' 'return'
 ---@return any
-function pointer_info(p, ret)
-    local insn = ret and detect_return(p)
+function UDbgTarget:pointer_info(p, ret)
+    local insn = ret and self:detect_return(p)
     if insn then return 'return', insn end
-    local text, wide = detect_string(p)
+    local text, wide = self:detect_string(p)
     if text then return wide and 'wstring' or 'cstring', text end
-    local sym = get_symbol(p)
+    local sym = self:get_symbol(p)
     if sym then return 'symbol', sym end
 end
 

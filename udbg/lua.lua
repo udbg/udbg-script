@@ -75,20 +75,22 @@ do -------- Extend table --------
         end
 
         local floor = math.floor
-        local min = 1
-        local max = #list
+        local min, max = 1, #list
         while min <= max do
             local mid = floor((max+min)/2)
             local r = comparator(list[mid], elem)
             if r == 0 then
                 return mid
             elseif r > 0 then
-                min = mid + 1
-            else
                 max = mid - 1
+            else
+                min = mid + 1
             end
         end
-        return nil, max
+
+        if max > 0 then
+            return nil, max
+        end
     end
 
     setmetatable(table, {
@@ -168,20 +170,27 @@ do  -------- Pretty Format --------
     pretty = {} setmetatable(pretty, pretty)
     local seropt = {indent = '  ', sortkeys = true, comment = false, nocode = true}
     local lineopt = {sortkeys = true, comment = false, nocode = true}
+    pretty.lineopt = lineopt
+    local hexopt = {sortkeys = true, comment = false, nocode = true, numformat = '0x%X'}
+    pretty.hexopt = hexopt
+    local serpent_line = serpent.line
+
     function pretty:__call(val, opt)
         return serpent.block(val, opt or seropt)
     end
 
     function pretty:__mod(val)
-        return serpent.line(val, lineopt)
+        return serpent_line(val, lineopt)
     end
 
     function pretty:__pow(val)
         return serpent.block(val, seropt)
     end
 
-    local serpent_line = serpent.line
-    local hexopt = {sortkeys = true, comment = false, nocode = true, numformat = '0x%X'}
+    function pretty:__mul(val)
+        return serpent.block(val, hexopt)
+    end
+
     function hex_line(val)
         return serpent_line(val, hexopt)
     end

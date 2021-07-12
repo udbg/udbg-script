@@ -86,8 +86,8 @@ function ui.update_view(what)
 end
 
 function ui.stop_target()
-    if udbg.target then
-        udbg.kill()
+    if udbg.current_target then
+        udbg.current_target:kill()
     end
     if udbg.target then
         ui.continue 'run'
@@ -95,8 +95,8 @@ function ui.stop_target()
 end
 
 function ui.detach_target()
-    if udbg.target then
-        udbg.detach()
+    if udbg.current_target then
+        udbg.current_target:detach()
         ui.continue 'run'
     end
 end
@@ -202,7 +202,9 @@ function event.on.ui_inited()
     actionAttach.on_trigger = ucmd.wrap('list-process')
     actionDetach.on_trigger = ui.detach_target
     actionStop.on_trigger = ui.stop_target
-    actionPause.on_trigger = udbg.pause
+    actionPause.on_trigger = function()
+        udbg.current_target:pause()
+    end
     actionRestart.on_trigger = ui.restart_target
 
     ui.menu_option:add_action {
@@ -269,15 +271,16 @@ function ui.save_target_data(target)
     if not target then return end
 
     local module_bp = {}
-    for _, id in ipairs(get_bp_list()) do
-        local info = get_bp(id, 'extra')
+    local t = target[1]
+    for _, id in ipairs(t:get_bp_list()) do
+        local info = t:get_bp(id, 'extra')
         if info then
             local list = module_bp[info.module]
             if not list then
                 list = table {}
                 module_bp[info.module] = list
             end
-            info.enable = get_bp(id, 'enable')
+            info.enable = t:get_bp(id, 'enable')
             -- log(hex_line(item))
             list:insert(info)
         end
@@ -311,11 +314,11 @@ function event.on.target_success()
     local image_base = target.image_base or 0
 
     if image_base == 0 then
-        local m = target.enum_module()()
+        local m = enum_module()()
         image_base = m and m.base or 0
         target.image = m
     else
-        target.image = target.get_module(image_base)
+        target.image = get_module(image_base)
     end
     ui.goto_mem(image_base)
     if target.image then
@@ -329,7 +332,7 @@ end
 function event.on.process_create()
     local target = udbg.target
     if not target.image then
-        target.image = target.get_module(target.image_base)
+        target.image = get_module(target.image_base)
         if target.image then
             ui.goto_cpu(target.image.entry_point)
         end

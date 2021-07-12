@@ -21,6 +21,38 @@ udbg.config = {
 -- __config is temporary config
 __config = setmetatable({}, {__index = udbg.config})
 
+-- compatible with global functions
+do
+    local target
+    function _ENV:__index(k)
+        local val = udbg[k]
+        -- if not val and type(k) == 'string' then
+        --     k = k:gsub('_', '.')
+        --     local ok, err = pcall(require, k)
+        --     if ok then
+        --         val = err
+        --     end
+        -- end
+        if not val then
+            local method = UDbgTarget[k]
+            if type(method) == 'function' then
+                val = function(...) return method(target, ...) end
+            end
+        end
+        rawset(self, k, val)
+        return val
+    end
+    setmetatable(_ENV, _ENV)
+
+    function event.on.target_success()
+        target = udbg.current_target
+    end
+
+    function event.on.target_end()
+        target = nil
+    end
+end
+
 do          -- breakpoint
     local bp_callback = {}
     local bp_extra_info = {}
@@ -37,7 +69,6 @@ do          -- breakpoint
         end
     end
 
-    local add_bp_, del_bp_, set_bp_ = udbg.add_bp_, udbg.del_bp_, udbg.set_bp_
     local pending_bp = {} _ENV.pending_bp = pending_bp
 
     event.on('module-load', function()
@@ -56,7 +87,7 @@ do          -- breakpoint
         end
     end)
 
-    function add_bp(a, opt, arg3)
+    function UDbgTarget:add_bp(a, opt, arg3)
         if type(a) == 'table' then
             opt = a
             a = opt.address
@@ -76,7 +107,7 @@ do          -- breakpoint
             temp, tid = opt.temp, opt.tid
         end
 
-        local address = parse_address(a)
+        local address = self:parse_address(a)
         if not address then
             opt = opt or {}
             if type(a) == 'string' and opt.auto then
@@ -89,15 +120,15 @@ do          -- breakpoint
             end
         end
 
-        local id, err = add_bp_(address, bp_type, bp_size, temp, tid)
+        local id, err = self:add_bp_(address, bp_type, bp_size, temp, tid)
         if err == 'exists' then
-            del_bp(address)
-            id, err = add_bp_(address, bp_type, bp_size, temp, tid)
+            self:del_bp(address)
+            id, err = self:add_bp_(address, bp_type, bp_size, temp, tid)
         end
 
         if id then
-            set_bp(id, 'enable', enable)
-            set_bp(id, 'callback', callback)
+            self:set_bp(id, 'enable', enable)
+            self:set_bp(id, 'callback', callback)
             -- for target data
             if not callback then
                 local m = get_module(address)
@@ -106,7 +137,7 @@ do          -- breakpoint
                         module = m.name,
                         type = bp_type,
                         rva = address - m.base,
-                        symbol = get_symbol(address),
+                        symbol = self:get_symbol(address),
                     }
                 end
             end
@@ -115,32 +146,32 @@ do          -- breakpoint
         return id, err
     end
 
-    function set_bp(id, key, val)
+    function UDbgTarget:set_bp(id, key, val)
         if key == 'callback' then
             local t = type(val)
             assert(t == 'function' or t == 'nil')
             bp_callback[id] = val
         else
-            return set_bp_(id, key, val)
+            return self:set_bp_(id, key, val)
         end
     end
 
-    function del_bp(id)
+    function UDbgTarget:del_bp(id)
         id = parse_address(id)
         if not id then error 'invalid address' end
 
-        del_bp_(id)
+        self:del_bp_(id)
         bp_callback[id] = nil
     end
 
-    function get_bp(id, ...)
+    function UDbgTarget:get_bp(id, ...)
         local key = ... or 'callback'
         if key == 'callback' then
             return bp_callback[id]
         elseif key == 'extra' then
             return bp_extra_info[id]
         else
-            return get_bp_(id, ...)
+            return self:get_bp_(id, ...)
         end
     end
 end
@@ -233,7 +264,7 @@ do
             if os.name == 'windows' then
                 if code == excp.STATUS_ACCESS_VIOLATION or code == excp.STATUS_IN_PAGE_ERROR then
                     local t = {[0] = 'read', [1] = 'write', [8] = 'DEP'}
-                    what, addr = udbg.eparam(0), udbg.eparam(1)
+                    what, addr = eparam(0), eparam(1)
                     what = '[' .. (t[what] or hex(what)) .. ']'
                     addr = fmt_addr_sym(addr)
                 end
@@ -351,7 +382,7 @@ do
     ---@field attach boolean
     udbg.dbgopt = {}
 
-    ---@class UDbgTarget
+    ---@class UTarget
     ---@field pid integer
     ---@field psize integer
     ---@field arch string
@@ -371,7 +402,7 @@ do
                 local event_id = udbg.event_id
                 local ok, err, target, continue_event
 
-                ---@type UDbgTarget
+                ---@type UTarget
                 udbg.target = opt
                 ok, target, continue_event = pcall(udbg.create, opt)
                 if not ok then
@@ -390,6 +421,7 @@ do
                 local trace_routine, trace_tid
 
                 udbg.set('target', target[1])
+                udbg.current_target = target[1]
                 udbg.target, udbg.event_args = target, {}
                 local event_meta = {}
                 setmetatable(udbg.event_args , event_meta)
@@ -492,6 +524,7 @@ do
                 end
 
                 udbg.target = nil
+                udbg.current_target = nil
                 event.fire('target-end', target)
                 udbg.set('target', nil)
             end)

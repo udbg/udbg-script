@@ -1,6 +1,8 @@
 
 error 'this file should not be execute'
 
+UDbgTarget = {}
+
 -- lua value to pointer(integer)
 ---@param method integer|string
 ---@param value any
