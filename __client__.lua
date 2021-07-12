@@ -6,7 +6,20 @@ _ENV.g_client = client
 local root_dir = client:get 'root'
 local script_dir = path.join(root_dir, 'script')
 local config_dir = os.env 'UDBG_CONFIG' or path.join(root_dir, 'config')
+if not path.exists(config_dir) then
+    -- find config directory upward
+    local dir = path.dirname(os.getexe())
+    while dir do
+        local cfgdir = path.join(dir, '.udbg')
+        if path.isdir(cfgdir) then
+            config_dir = cfgdir
+            break
+        end
+        dir = path.dirname(dir)
+    end
+end
 client.config_dir = config_dir
+
 local origin_paths = package.path
 local lua_paths = {
     path.join(script_dir, '?.lua'),

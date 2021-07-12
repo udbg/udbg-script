@@ -33,8 +33,9 @@ function find_binary(opt)
     local a = assert(opt.address or opt[1])
     local pattern = assert(opt.pattern or opt[2])
     local size = opt.size or opt[3] or 0x1000
+    local target = opt.target or udbg.target
 
-    local iter = search_binary(read_bytes(a, size), pattern)
+    local iter = search_binary(target.read_bytes(a, size), pattern)
     return function()
         local offset = iter()
         if offset then
@@ -50,12 +51,13 @@ function search_memory(opt)
         pattern = binary_pattern(pattern)
     end
 
-    local start = opt.start and parse_address(opt.start)
+    local target = opt.target or udbg.target
+    local start = opt.start and target.parse_address(opt.start)
     start = start or 0
-    local stop = opt.stop and parse_address(opt.stop)
+    local stop = opt.stop and target.parse_address(opt.stop)
     stop = stop or 0x7FFFFFFFF
     if opt.module then
-        local m = assert(get_module(opt.module), 'invalid module')
+        local m = assert(target.get_module(opt.module), 'invalid module')
         start = m.base stop = m.base + m.size
     end
     -- log('start:', hex(start), 'stop:', hex(stop))
@@ -63,13 +65,13 @@ function search_memory(opt)
     return coroutine.wrap(function()
         local plain = opt.plain
         local yield = coroutine.yield
-        for m in enum_memory() do
+        for m in target.enum_memory() do
             local base, size = m.base, m.size
             -- if start then valid = valid and  end
             -- if stop then valid = valid and base + size < stop end
             if base >= start then
                 local i = 1
-                local buf = read_bytes(base, size)
+                local buf = target.read_bytes(base, size)
                 while buf do
                     if base + i - 1 >= stop then goto END end
                     i = buf:find(pattern, i, plain)
@@ -88,15 +90,16 @@ function yara_search(opt)
     local rules = opt.rules or opt[1]
     local callback = assert(type(opt.callback) == 'function' and opt.callback)
     local progress = opt.progress
+    local target = opt.target or udbg.target
 
-    local start = opt.start and parse_address(opt.start)
+    local start = opt.start and target.parse_address(opt.start)
     start = start or 0
-    local stop = opt.stop and parse_address(opt.stop)
+    local stop = opt.stop and target.parse_address(opt.stop)
     stop = stop or 0x7FFFFFFFFFFF
     assert(start < stop, 'start must less than stop')
 
     if opt.module then
-        local m = assert(get_module(opt.module), 'invalid module')
+        local m = assert(target.get_module(opt.module), 'invalid module')
         start = m.base stop = m.base + m.size
     end
     -- log('start:', hex(start), 'stop:', hex(stop))
@@ -106,7 +109,7 @@ function yara_search(opt)
 
     local max = opt.max
     local c = 0
-    for m in enum_memory() do
+    for m in target.enum_memory() do
         if opt.abort then break end
         if max and c > max then break end
 
@@ -116,7 +119,7 @@ function yara_search(opt)
         if start > la and start < ra then la = start end
         if stop > la and stop < ra then ra = stop end
 
-        local buf = read_bytes(la, ra - la)
+        local buf = target.read_bytes(la, ra - la)
         if buf then
             local err, reason = scanner(buf, function(rule, offset, len)
                 c = c + 1

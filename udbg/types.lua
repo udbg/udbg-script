@@ -56,6 +56,8 @@ local function read_ty(ty, address)
     end
 end
 
+local lib = {types = types, Type = Type, read_type = read_ty}
+
 do  -- Type
     local function Type___index(self, key)
         local field_list = rawget(self, 'field_list')
@@ -103,10 +105,16 @@ do  -- Type
 end
 
 do  -- CVal
-    local const F_ADDR = -1
-    local const F_TYPE = -2
-    local const FIELDLIST = -3
-    local const PTR_LEVEL = -4
+    local F_ADDR<const> = -1
+    local F_TYPE<const> = -2
+    local FIELDLIST<const> = -3
+    local PTR_LEVEL<const> = -4
+
+    function lib.addressof(val)
+        if getmetatable(val) == CVal then
+            return val[F_ADDR]
+        end
+    end
 
     function CVal.new(address, ty, pointer_level)
         assert(type(address) == 'number')
@@ -176,7 +184,6 @@ local function align(offset, size)
     return offset
 end
 
-local lib = {types = types, Type = Type, read_type = read_ty}
 local ty_cache_p1 = {}
 
 function lib.def(declare, nn)

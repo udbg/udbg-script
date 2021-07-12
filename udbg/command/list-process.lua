@@ -41,12 +41,16 @@ end
 function mod.main(args, out)
     local get_detail
     if os.name == 'windows' then
-        local misc = require 'win.misc'
+        local misc
         function get_detail(item, path)
             if args.verify then
+                misc = misc or require 'win.misc'
                 item:insert(misc.verifyFile(path).info)
+            else
+                item:insert('')
             end
             if args.info then
+                misc = misc or require 'win.misc'
                 local info = misc.getFileInfo(path)
                 item:insert(info and info.FileDescription or '')
             end

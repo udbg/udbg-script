@@ -67,6 +67,30 @@ do -------- Extend table --------
         return result
     end
 
+    function table.binary_search(list, elem, comparator)
+        comparator = comparator or function(a, b)
+            if a == b then return 0 end
+            if a < b then return -1 end
+            if a > b then return 1 end
+        end
+
+        local floor = math.floor
+        local min = 1
+        local max = #list
+        while min <= max do
+            local mid = floor((max+min)/2)
+            local r = comparator(list[mid], elem)
+            if r == 0 then
+                return mid
+            elseif r > 0 then
+                min = mid + 1
+            else
+                max = mid - 1
+            end
+        end
+        return nil, max
+    end
+
     setmetatable(table, {
         __call = function(self, t)
             return setmetatable(t, table)
