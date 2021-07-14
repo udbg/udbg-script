@@ -118,11 +118,11 @@ end
 
 function event.on.ui_inited()
     ui.view_module, ui.view_pages, ui.view_thread,
-    ui.view_handle, ui.view_mem,
+    ui.view_handle, ui.view_mem, ui.menu_file,
     ui.menu_view, ui.menu_option, ui.menu_help,
     ui.menu_plugin, ui.g_status = ui.main:find_child {
         'module', 'memoryLayout', 'thread',
-        'handle', 'memory',
+        'handle', 'memory', 'menuFile',
         'menuView', 'menuOption', 'menuHelp',
         'menuPlugin', 'status',
     }
@@ -134,6 +134,28 @@ function event.on.ui_inited()
                 ucmd {'dump-memory', '-m', m, path}
             end
         end
+    }
+
+    local lastrunning = {__mode = 'v'}
+    setmetatable(lastrunning, lastrunning)
+    ui.menu_help:add_menu {separator = true, index = 0}
+    ui.view_task = ui.menu_help:add_menu {
+        title = 'Tas&k', index = 0;
+
+        on_trigger = function(self, name)
+            local i = tonumber(name:match('%d+'))
+            local task = lastrunning[i]
+            ui.info('abort task:', i, task.name)
+            require 'udbg.task'.try_abort(task)
+        end,
+        on_show = function(self)
+            table.clear(lastrunning)
+            self 'clear'
+            for i, task in ipairs(require 'udbg.task'.running) do
+                lastrunning[i] = task
+                self:add_action {title = '&' .. i .. '. ' .. task.name}
+            end
+        end,
     }
 
     function ui.view_mem:on_modify(a, ty, val)
@@ -325,6 +347,8 @@ function event.on.target_success()
         ui.goto_cpu(target.image.entry_point)
     end
 
+    local name = os.path.basename(target.path)
+    ui.main:set('windowTitle', name .. ' - ' .. target.pid)
     ui.g_status:set('text', target.status:gsub('^.', string.upper))
     ui.load_target_data()
 end

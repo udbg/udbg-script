@@ -191,6 +191,10 @@ do  -------- Pretty Format --------
         return serpent.block(val, hexopt)
     end
 
+    function pretty:__bor(val)
+        return serpent_line(val, hexopt)
+    end
+
     function hex_line(val)
         return serpent_line(val, hexopt)
     end

@@ -156,3 +156,23 @@ function string.equal(t1, t2, case_sensitive) end
 ---@param case_sensitive? boolean @default is false
 ---@return boolean
 function string.wildmatch(s, pattern, case_sensitive) end
+
+---convert ANSI string to utf8 string
+---@param s string
+---@param codepage? integer
+function ansi_to_utf8(s, codepage) end
+
+---convert utf8 string to ANSI string
+---@param s string
+---@param codepage? integer
+function utf8_to_ansi(s, codepage) end
+
+---convert ANSI string to utf16 string
+---@param s string
+---@param codepage? integer
+function ansi_to_utf16(s, codepage) end
+
+---convert utf16 string to ANSI string
+---@param s string
+---@param codepage? integer
+function utf16_to_ansi(s, codepage) end

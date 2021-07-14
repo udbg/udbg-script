@@ -25,10 +25,33 @@ function libffi.malloc(size) end
 ---@return ...
 function libffi.read_pack(ptr, fmt) end
 
----read bytes
+---write type
 ---@param ptr integer|userdata
----@param size? integer
+---@param fmt string @see string.pack
+---@param val any
+function libffi.write_pack(ptr, fmt, val) end
+
+---read bytes from memory directly (lua_pushlstring)
+---@param ptr integer|userdata
+---@param size integer
 ---@return string
 function libffi.read(ptr, size) end
 
-function libffi.string(ptr) end
+---write bytes to memory directly (memcpy)
+---@param ptr integer|userdata
+---@param size? integer
+---@return string
+function libffi.write(ptr, size) end
+
+---fill memory with value (memset)
+---@param ptr integer|userdata
+---@param val integer
+---@param size integer
+---@return string
+function libffi.fill(ptr, val, size) end
+
+---read a c-string from memory directly (lua_pushstring)
+---@param ptr integer|userdata
+---@param size? integer
+---@return string
+function libffi.string(ptr, size) end

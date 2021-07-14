@@ -183,6 +183,7 @@ end
 ---@field main function
 ---@field name string
 ---@field parser string?
+---@field is_task boolean
 ---@field view_type string?
 ---@field registered boolean?
 ---@field menu CtrlOpt[] @right-click menu
@@ -262,14 +263,35 @@ local function table_outer(name, command)
 
     outer.__index = outer
     outer.__call = function(self, ...)
+        local args = {...}
         if self.icol > 0 then
-            local args = {...}
             for i = 1, #args do
                 tbl:set_line(-1, self.icol + i - 1, args[i])
             end
             self.icol = 0
         else
-            tbl:append({...})
+            local color
+            for i, val in ipairs(args) do
+                if type(val) == 'table' then
+                    args[i] = val.text
+                    local c = val.color
+                    if c then
+                        if type(c) == 'string' then
+                            c = ui.color[c] or 0
+                        end
+                        if c > 0 then
+                            color = color or {}
+                            color[i] = c
+                        end
+                    end
+                end
+            end
+            tbl:append(args)
+            if color then
+                for i, c in pairs(color) do
+                    tbl(ui.SET_COLOR, -1, i-1, c)
+                end
+            end
         end
         self.line = self.line + 1
     end
@@ -352,10 +374,7 @@ function cmd.dispatch(cmdline, prefix)
     -- parse cmdline
     local err, suc, args, task
     local main, parser = command.main, command.parser
-    if type(parser) == 'table' then
-        task = parser.task
-        parser = parser.parser
-    end
+    task = command.is_task
 
     if type(parser) == 'string' then
         suc, args = pcall(lapp, parser, argv)
@@ -383,8 +402,8 @@ function cmd.dispatch(cmdline, prefix)
         local function docmd() main(args, outer) end
         if task then
             function docmd()
-                require 'udbg.task'.spawn(function()
-                    main(args, outer)
+                require 'udbg.task'.spawn(function(task)
+                    main(args, outer, task)
                 end, {name = cmdline})
             end
         end

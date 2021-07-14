@@ -39,6 +39,8 @@ end
 
 local service = {}
 local unpack = table.unpack
+setmetatable(service, service)
+
 function service:__newindex(key, val)
     if type(val) == 'function' then
         local i = debug.getinfo(val, 'u')
@@ -62,4 +64,13 @@ service['@call'] = function(data)
     error(r)
 end
 
-return setmetatable(service, service)
+local fn
+function service.fficall(proc, ...)
+    if not fn then
+        fn = require 'libffi'.fn
+    end
+    -- assert(proc, 'invalid proc')
+    return fn(proc)(...)
+end
+
+return service

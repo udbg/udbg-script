@@ -365,14 +365,19 @@ local Widget = {} do
     setmetatable(class, class)
 
     local function handle_class_info(info)
+        local methodIndex, propIndex = {}, {}
         for i, method in ipairs(info.methods) do
             method.index = i - 1
+            methodIndex[method.name] = i - 1
             info.methods[method.name] = method
         end
         for i, prop in ipairs(info.properties) do
             prop.index = i - 1
+            propIndex[prop.name] = i - 1
             info.properties[prop.name] = prop
         end
+        info.propIndex = propIndex
+        info.methodIndex = methodIndex
         return info
     end
 
@@ -528,6 +533,7 @@ local Widget = {} do
     local TABLE_APPEND = 1103
     ui.APPEND = 1103
     local TABLE_SET_COLOR = 1106
+    ui.SET_COLOR = 1106
 
     ---get specific line data
     ---@param l integer|"'.'" @line number, '.' means the selected line
