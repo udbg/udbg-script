@@ -21,7 +21,7 @@ function ui_request(method, value) end
 function __loadremote(name) end
 
 -- enum module
----@return function
+---@return fun():UDbgModule
 function enum_module() end
 
 ---@class UDbgModule
@@ -30,7 +30,53 @@ function enum_module() end
 ---@field name string
 ---@field arch string
 ---@field path string
+---@field symbol SymbolFile|nil
 ---@field entry_point integer
+local UDbgModule = {}
+
+function UDbgModule:enum_symbol(name) end
+
+function UDbgModule:enum_export(name) end
+
+function UDbgModule:find_function(address) end
+
+---get symbol info by name
+---@param name string
+---@return Symbol
+function UDbgModule:get_symbol(name) end
+
+---add custome symbol for this module
+---@param offset integer
+---@param name string
+function UDbgModule:add_symbol(offset, name) end
+
+---load symbol file for this module
+---@param path string @pdb file path
+---@return boolean success
+---@return string? error
+function UDbgModule:load_symbol(path) end
+
+---@class SymbolFile
+local SymbolFile = {}
+
+---get type information
+---@param what string|integer
+---@return string kind of type
+---@return any extra infomation
+function SymbolFile:get_type(what) end
+
+function SymbolFile:get_field(type_id) end
+
+function SymbolFile:enum_field(type_id) end
+
+---@class Symbol
+---@field name string
+---@field uname string
+---@field offset integer
+---@field len integer
+---@field flags integer
+---@field type_id integer|nil
+local Symbol = {}
 
 ---@class UDbgThread
 ---@field tid integer
@@ -41,8 +87,14 @@ function enum_module() end
 ---@field name string
 ---@field status string
 ---@field priority string
----@field suspend function(self):integer
----@field resume function(self):integer
+local UDbgThread = {}
+
+---suspend the thread
+---@return integer suspend count
+function UDbgThread:suspend() end
+
+---resume the thread
+function UDbgThread:resume() end
 
 -- get thread list
 ---@return UDbgThread[]
@@ -98,12 +150,6 @@ function enum_memory() end
 -- enum process's handle
 ---@return fun():integer,integer,string,string @handle,type_index,type_name,name
 function enum_handle(pid) end
-
----assemble a statement
----@param address integer
----@param asm string
----@param arch string|nil
-function assemble(address, asm, arch) end
 
 ---@class Capstone
 local Capstone = {}

@@ -22,45 +22,60 @@ function CLASS:__call(...)
     return result and setmetatable(result, self)
 end
 
--- TODO
--- Return a class object
---  class(...) -> instance
+local metaMethod = {
+    '__call', '__close', '__gc',
+    '__add', '__sub', '__mul', '__div', '__idiv', '__unm', '__pow', '__mod',
+    '__and', '__or', '__not',
+    '__band', '__bor', '__bnot', '__bxor', '__shl', '__shr',
+    '__len', '__lt', '__le', '__eq', '__len',
+}
 local function class(body)
-    -- Attribute
-    -- local attrs = body.__attr
-    -- if attrs then
-    --     assert(type(attrs) == 'table')
-    --     for i = 1, #attrs do
-    --         local attrname = attrs[i]
-    --         attrs[i] = nil
-    --         local attrfunc = rawget(body, attrname)
-    --         assert(type(attrfunc) == 'function')
-    --         attrs[attrname] = attrfunc
-    --     end
-    -- end
-    local parent = body.parent
+    local parent = body.__parent
     local __index = body.__index
     local __newindex = body.__newindex
 
-    -- Get
-    function body:__index(key)
-        -- print(key)
-        -- local attrfunc = attrs and attrs[key]
-        -- if attrfunc then return attrfunc(self) end
-        return rawget(body, key) or (__index and __index(self, key))
-               or (parent and parent.__index and parent.__index(self, key))
+    if parent then
+        for _, name in ipairs(metaMethod) do
+            if parent[name] and not body[name] then
+                body[name] = parent[name]
+            end
+        end
     end
 
-    -- Set
-    function body:__newindex(key, val)
-        -- local attrfunc = attrs and attrs[key]
-        -- if attrfunc then return attrfunc(self, val, 1) end
-        if __newindex then
-            return __newindex(self, key, val)
-        else
+    local parentIndex = parent and parent.__index
+    function body:__index(key)
+        local val = rawget(body, key)
+        if val == nil and __index then
+            val = __index(self, key)
+        end
+        if val == nil and parentIndex then
+            val = parentIndex(self, key)
+        end
+        return val
+    end
+
+    local get = body.__get
+    if type(get) == 'table' then
+        local index = body.__index
+        function body:__index(key)
+            local getter = get[key]
+            if getter then return getter(self, key) end
+            return index(self, key)
+        end
+    end
+
+    local set = body.__set
+    if type(set) == 'table' then
+        function body:__newindex(key, val)
+            local setter = set[key]
+            if setter then return setter(self, val) end
+            if __newindex then
+                return __newindex(self, key, val)
+            end
             return rawset(self, key, val)
         end
     end
+
     return setmetatable(body, CLASS)
 end
 
@@ -68,8 +83,7 @@ local lib = {}
 
 function lib:__call(...) return class(...) end
 
-lib.enum = class
-{
+lib.enum = class {
     __init = function(self, t)
         for k, v in pairs(t) do
             self[k] = v self[v] = k
@@ -77,14 +91,10 @@ lib.enum = class
     end
 }
 
-
-lib.bits = class
-{
+lib.bits = class {
     __init = function(self, t)
         table.update(self, t)
-        for k, v in pairs(t) do
-            rawset(self, v, k)
-        end
+        table.swap_key_value(self, true)
     end,
     -- Combine All Bit String of a Number
     __index = function(self, key)
