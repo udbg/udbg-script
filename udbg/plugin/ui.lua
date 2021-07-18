@@ -171,18 +171,18 @@ function event.on.ui_inited()
     if windows then
         local view_thread = ui.view_thread
         view_thread.on_dblclick = function()
-            local a = PA(view_thread:line('.', 1):match'%x+')
+            local a = parse_address(view_thread:line('.', 1):match'%x+')
             ui.goto_cpu(a)
         end
         view_thread:set('columns', {'TID', 'Entry', 'TEB', 'PC', 'Status', 'Priority', 'Suspend Count', 'Last Error'})
         view_thread:set('columnWidths', {6, 24, 18, 16, 12, 8, 4, 12})
         view_thread:add_action 'Goto Entry'.on_trigger = view_thread.on_dblclick
         view_thread:add_action 'Goto TEB'.on_trigger = function()
-            local a = PA(view_thread:line('.', 2))
+            local a = parse_address(view_thread:line('.', 2))
             ui.goto_mem(a)
         end
         view_thread:add_action 'Goto PC'.on_trigger = function()
-            local a = PA(view_thread:line('.', 3):match'%x+')
+            local a = parse_address(view_thread:line('.', 3):match'%x+')
             ui.goto_cpu(a)
         end
         view_thread:add_action '&Suspend'.on_trigger = function()
@@ -233,6 +233,11 @@ function event.on.ui_inited()
         title = 'Command &Cache', checked = true,
         on_trigger = function(self, val) ucmd.use_cache = val end
     }
+    ui.menu_option:add_menu {separator = true}
+    ui.menu_option:add_action {
+        title = '&Option',
+        on_trigger = ucmd.wrap 'config',
+    }
 
     if udbg.dbgopt.target then
         udbg.start(udbg.dbgopt)
@@ -248,7 +253,7 @@ function event.on.user_close()
     if udbg.target and udbg.target.status ~= 'opened' then
         exit = ui.dialog {
             title = 'Target is running', parent = true;
-            min_hint = false, max_hint = false;
+
             ui.label 'really exit?',
             ui.buttonbox {'yes', 'no'},
         }:call 'int exec' > 0

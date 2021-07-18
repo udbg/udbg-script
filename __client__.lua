@@ -44,6 +44,7 @@ verbose('[args]', pretty ^ args)
 
 local config = {
     precompile = true,
+    precompile_strip = true,
     data_dir = false,
     plugins = {},
     remote_map = {},
@@ -237,7 +238,7 @@ do  -- rpc service function
             local size = #res
             if config.precompile and size > 2048 then
                 res = assert(load(res, lua_path))
-                res = string.dump(res)
+                res = string.dump(res, config.precompile_strip)
                 verbose('save the size:', (size - #res) / 1024)
             end
             return {lua_path, res}

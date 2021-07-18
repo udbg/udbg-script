@@ -5,7 +5,6 @@ local ui = require 'udbg.ui'
 local event = require 'udbg.event'
 local unpack, type = table.unpack, type
 
-service.on_listen_key = ui.on_listen_key
 service.on_ctrl_event = ui.on_ctrl_event
 
 function service.fire_event(args)

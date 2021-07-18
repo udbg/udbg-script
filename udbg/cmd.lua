@@ -7,6 +7,10 @@ function lapp.quit(msg, no_usage)
     ui.error(msg) error('')
 end
 
+lapp.add_type('address', function(s)
+    return assert(eval_address(s), 'invalid address expression')
+end)
+
 local cmd = {
     use_cache = true,
     no_outer = false,
@@ -234,7 +238,11 @@ local function table_outer(name, command)
         command.on_view(vbox)
     end
 
-    ui.dialog {title = name, size = {0.5, 0.5}; vbox} 'show' 'raise'
+    ui.dialog {
+        title = name, size = {0.5, 0.5},
+        windowFlags = ui.WindowType.WindowMinMaxButtonsHint | ui.WindowType.WindowCloseButtonHint;
+        vbox
+    } 'show' 'raise'
     tbl:add_action {
         title = 'Goto &CPU',
         on_trigger = function()
@@ -301,7 +309,7 @@ local function table_outer(name, command)
         elseif key == 'title' then
             tbl:set('columns', val)
         elseif key == 'progress' then
-            progress.value = val
+            progress:set('value', val)
         else
             rawset(self, key, val)
         end

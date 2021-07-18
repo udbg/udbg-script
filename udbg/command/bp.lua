@@ -1,4 +1,6 @@
 
+require 'udbg.alias'
+
 local mod = {}
 
 require('pl.lapp').add_type('bp_type', function(s)

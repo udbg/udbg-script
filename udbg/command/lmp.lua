@@ -1,4 +1,6 @@
 
+require 'udbg.alias'
+
 local fmt_base = '%-18s'
 local fmt_size = '%-10s'
 local function print_region(region, out, address)

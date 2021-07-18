@@ -29,7 +29,7 @@ function mod.main(args)
     if args.reg then
         local k = args.reg
         if args.value then
-            reg[k] = EA(args.value)
+            reg[k] = eval_address(args.value)
         end
         show(k)
     else

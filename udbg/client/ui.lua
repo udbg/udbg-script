@@ -38,7 +38,7 @@ ui.actionAbout.on_trigger = function()
     local version = g_session:request('get_global', 'udbg.version')
     ui.dialog {
         title = 'About', parent = true;
-        min_hint = false, max_hint = false;
+
         ui.label {title = about:gsub('%$(%w+)', {version = version}), textFormat = 3},
     }:call 'exec'
 end

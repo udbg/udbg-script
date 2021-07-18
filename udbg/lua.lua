@@ -31,7 +31,7 @@ do -------- Extend table --------
     function table:swap_key_value(update)
         local r = {}
         for k, v in pairs(self) do r[v] = k end
-        if update then self:update(r) end
+        if update then table.update(self, r) end
         return r
     end
 

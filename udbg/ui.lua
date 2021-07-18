@@ -1,6 +1,7 @@
 
 require 'udbg.lua'
 
+local class = require 'class'
 local unpack = table.unpack
 local rawset = rawset
 local xpcall, type = xpcall, type
@@ -68,7 +69,96 @@ local ui = {
     notify = ui_notify, request = ui_request,
     color = color,
     TreeItem = TreeItem,
+
+    -- Qt::Orientation
+    Orientation = class.enum {
+        Horizontal = 0x1,
+        Vertical = 0x2,
+    },
+    -- Qt::WindowState
+    WindowState = class.bits {
+        WindowNoState    = 0x00000000,
+        WindowMinimized  = 0x00000001,
+        WindowMaximized  = 0x00000002,
+        WindowFullScreen = 0x00000004,
+        WindowActive     = 0x00000008
+    },
 }
+
+do
+    -- Qt::WindowType
+    local Window = 1
+    local Sheet = 0x00000004 | Window
+    local Dialog = 0x00000002 | Window
+    local Popup = 0x00000008 | Window
+    local ToolTip = Popup | Sheet
+    local WindowMinimizeButtonHint = 0x00004000
+    local WindowMaximizeButtonHint = 0x00008000
+
+    ui.WindowType = {
+        Widget = 0x00000000,
+        Window = 0x00000001,
+        Dialog = Dialog,
+        Sheet = 0x00000004 | Window,
+        Drawer = Sheet | Dialog,
+        Popup = Popup,
+        Tool = Popup | Dialog,
+        ToolTip = ToolTip,
+        SplashScreen = ToolTip | Dialog,
+        Desktop = 0x00000010 | Window,
+        SubWindow = 0x00000012,
+        ForeignWindow = 0x00000020 | Window,
+        CoverWindow = 0x00000040 | Window,
+
+        WindowType_Mask = 0x000000ff,
+        MSWindowsFixedSizeDialogHint = 0x00000100,
+        MSWindowsOwnDC = 0x00000200,
+        BypassWindowManagerHint = 0x00000400,
+        -- X11BypassWindowManagerHint = BypassWindowManagerHint,
+        FramelessWindowHint = 0x00000800,
+        WindowTitleHint = 0x00001000,
+        WindowSystemMenuHint = 0x00002000,
+
+        WindowMinimizeButtonHint = WindowMinimizeButtonHint,
+        WindowMaximizeButtonHint = WindowMaximizeButtonHint,
+        WindowMinMaxButtonsHint = WindowMinimizeButtonHint | WindowMaximizeButtonHint,
+        WindowContextHelpButtonHint = 0x00010000,
+        WindowShadeButtonHint = 0x00020000,
+        WindowStaysOnTopHint = 0x00040000,
+        WindowTransparentForInput = 0x00080000,
+        WindowOverridesSystemGestures = 0x00100000,
+        WindowDoesNotAcceptFocus = 0x00200000,
+        MaximizeUsingFullscreenGeometryHint = 0x00400000,
+
+        CustomizeWindowHint = 0x02000000,
+        WindowStaysOnBottomHint = 0x04000000,
+        WindowCloseButtonHint = 0x08000000,
+        MacWindowToolBarButtonHint = 0x10000000,
+        BypassGraphicsProxyWidget = 0x20000000,
+        NoDropShadowWindowHint = 0x40000000,
+        WindowFullscreenButtonHint = 0x80000000
+    }
+
+    -- QSizePolicy::PolicyFlag
+    local PolicyFlag = class.bits {
+        GrowFlag = 1,
+        ExpandFlag = 2,
+        ShrinkFlag = 4,
+        IgnoreFlag = 8
+    }
+    ui.PolicyFlag = PolicyFlag
+
+    -- QSizePolicy::Policy
+    ui.SizePolicy = {
+        Fixed = 0,
+        Minimum = PolicyFlag.GrowFlag,
+        Maximum = PolicyFlag.ShrinkFlag,
+        Preferred = PolicyFlag.GrowFlag | PolicyFlag.ShrinkFlag,
+        MinimumExpanding = PolicyFlag.GrowFlag | PolicyFlag.ExpandFlag,
+        Expanding = PolicyFlag.GrowFlag | PolicyFlag.ShrinkFlag | PolicyFlag.ExpandFlag,
+        Ignored = PolicyFlag.ShrinkFlag | PolicyFlag.GrowFlag | PolicyFlag.IgnoreFlag
+    }
+end
 
 ---run a function in client
 ---@param fun function
@@ -84,115 +174,6 @@ function ui.call(fun, request)
         return ui_request('call', ups)
     end
     ui_notify('call', ups)
-end
-
-local ListenKey = {}
-ListenKey.__index = ListenKey do
-    local maps = {}
-    local registed = {}
-    -- https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
-    local VK = {
-        LBUTTON = 0x01,
-        RBUTTON = 0x02,
-        MBUTTON = 0x04,
-        [';'] = 0xBB,
-        ['+'] = 0xBB,
-        [','] = 0xBC,
-        ['-'] = 0xBD,
-        ['.'] = 0xBE,
-        F1 = 0x70,
-        F2 = 0x71,
-        F3 = 0x72,
-        F4 = 0x73,
-        F5 = 0x74,
-        F6 = 0x75,
-        F7 = 0x76,
-        F8 = 0x77,
-        F9 = 0x78,
-        F10 = 0x79,
-        F11 = 0x7A,
-        F12 = 0x7B,
-        F13 = 0x7C,
-        F14 = 0x7D,
-        F15 = 0x7E,
-        F16 = 0x7F,
-        F17 = 0x80,
-        F18 = 0x81,
-        F19 = 0x82,
-        F20 = 0x83,
-        F21 = 0x84,
-        F22 = 0x85,
-        F23 = 0x86,
-        F24 = 0x87,
-        SPACE = 0x20,
-        PRIOR = 0x21,
-        NEXT = 0x22,
-        END = 0x23,
-        HOME = 0x24,
-        LEFT = 0x25,
-        UP = 0x26,
-        RIGHT = 0x27,
-        DOWN = 0x28,
-        SELECT = 0x29,
-        PRINT = 0x2A,
-        EXECUTE = 0x2B,
-        SNAPSHOT = 0x2C,
-        INSERT = 0x2D,
-        DELETE = 0x2E,
-        HELP = 0x2F,
-        CONTROL = 0x11, CTRL = 0x11,
-        MENU = 0x12, ALT = 0x12,
-    }
-    local LISTEN_KEY = 1004
-    local CANCEL_LISTEN_KEY = 1005
-
-    local function trans(key)
-        key = key:upper()
-        if #key == 1 then
-            return string.byte(key)
-        else
-            return assert(VK[key])
-        end
-    end
-
-    ui.ListenKey = ListenKey
-    function ui.listen_key(obj)
-        local keys = obj.keys
-        assert(obj.callback)
-        if type(keys) ~= 'table' then
-            keys = {keys}
-        end
-        obj.name = table.concat(keys, '+')
-        local keysid = {}
-        for i, key in ipairs(keys) do
-            key = trans(key)
-            keys[i] = key
-            keysid[i] = ('%x'):format(key)
-        end
-        keysid = table.concat(keysid)
-        obj.keysid = keysid
-        local old = registed[keysid]
-        if old then
-            ui.info('[ListenKey]', 'unregister', old.name)
-            old:cancel()
-        end
-
-        local id = ui_request(LISTEN_KEY, keys)
-        obj.id = id
-        maps[id] = obj registed[keysid] = obj
-        return setmetatable(obj, ListenKey)
-    end
-
-    function ListenKey:cancel()
-        ui_notify(CANCEL_LISTEN_KEY, self.id)
-        maps[self.id] = nil
-        registed[self.keysid] = nil
-    end
-
-    function ui.on_listen_key(id)
-        local obj = maps[id]
-        obj:callback()
-    end
 end
 
 do      -- ui utils
@@ -246,31 +227,26 @@ end
 ---@field height number
 ---@field layout string|"'vbox'"|"'hbox'"
 ---@field class string
----@field on_destroy fun(self:Widget)
----@field on_toggle fun(self:Widget, state:boolean)
----@field on_click fun(self:Widget)
+---@field on_destroy fun(self:Object)
+---@field on_toggle fun(self:Object, state:boolean)
+---@field on_click fun(self:Object)
 
----@class Widget: CtrlOpt
+---@class Object: CtrlOpt
 ---@field private _ctrl_id integer @id on remote
 ---@field private _data_id integer @id on local
----@field private _root Widget
----@field childs Widget[]
----@field visible boolean
----@field value any
----@field state integer
-local Widget = {} do
+---@field private _root Object
+---@field childs Object[]
+local Object = class {__get = {}} do
     local weak_value = {__mode = 'v'}
-    ---@type table<integer, Widget>
+    ---@type table<integer, Object>
     local data_map = {}     -- data_id -> ctrl_data
     setmetatable(data_map, weak_value)
 
-    ---@type table<integer, Widget>
+    ---@type table<integer, Object>
     local qobj_map = {}     -- qobj_id -> ctrl_data
     -- setmetatable(qobj_map, qobj_map)
 
     local OBJECT_METADATA<const> = 1600
-    local OBJECT_PROPERTIES<const> = 1601
-    local OBJECT_METHODS<const> = 1602
     local WIDGET_SET_CALLBACK<const> = 1709
     local WIDGET_FIND_CHILD<const> = 1711
     local OBJECT_INVOKE<const> = 1712
@@ -294,15 +270,17 @@ local Widget = {} do
         return size
     end
 
+    local specialObject = {}
     -- register a control class
     ---@param opt table
-    ---@param class string | "'label'"|"'spin'"|"'button'"|"'radio'"|"'text'"|"'menu'"|"'action'"
-    ---@return Widget
-    local function register_ctrl(opt, class)
+    ---@param clazz string | "'label'"|"'spin'"|"'button'"|"'radio'"|"'text'"|"'menu'"|"'action'"
+    ---@return Object
+    local function register_ctrl(opt, clazz)
         if type(opt) == 'string' then
             opt = {title = opt}
         end
-        opt.class = class or 'widget'
+        clazz = clazz or opt._class or 'Object'
+        opt.class = clazz
         local data_id = topointer(opt)
         check_size(opt, 'size')
         check_size(opt, 'minsize')
@@ -310,7 +288,7 @@ local Widget = {} do
         opt._data_id = data_id
         data_map[data_id] = opt
         local ctrl_id = opt._ctrl_id
-        local result = ctrl_id and qobj_map[ctrl_id] or setmetatable(opt, Widget)
+        local result = ctrl_id and qobj_map[ctrl_id] or setmetatable(opt, specialObject[clazz] or Object)
         if ctrl_id then
             qobj_map[ctrl_id] = result
         end
@@ -340,7 +318,8 @@ local Widget = {} do
                 rawset(data, 'value', nil)
                 rawset(data, 'title', nil)
                 rawset(data, '_root', root)
-                rawset(data, '_class', data2ctrl[i+2])
+                local _class = data2ctrl[i+2]
+                rawset(data, '_class', _class)
 
                 qobj_map[ctrl_id] = data
                 if data.name then
@@ -350,19 +329,7 @@ local Widget = {} do
         end
     end
 
-    local PROPERTY = {
-        icon = 'icon',
-        focus = 'focus',
-        state =  'windowState',
-        value = 'value',
-        title = 'windowTitle',
-        visible = 'visible',
-        style = 'styleSheet',
-    }
-
-    local class = {} ui.class = class
-    class.__index = class
-    setmetatable(class, class)
+    local classInfo = {}
 
     local function handle_class_info(info)
         local methodIndex, propIndex = {}, {}
@@ -381,45 +348,19 @@ local Widget = {} do
         return info
     end
 
-    function class:__index(name)
-        local CLASS_INFO = 1630
-        local info = ui_request(CLASS_INFO, name or '')
-        if info then
-            class[name] = handle_class_info(info)
+    function Object.__get:_meta()
+        local info = rawget(classInfo, self._class)
+        if not info then
+            info = ui_request(OBJECT_METADATA, self._ctrl_id)
+            if info then
+                classInfo[self._class] = handle_class_info(info)
+            end
         end
+        rawset(self, '_meta', info)
         return info
     end
 
-    local function WidgetGet(self, key)
-        local attr = PROPERTY[key]
-        if attr then
-            if type(attr) == 'number' then
-                return ui_request(attr, self._ctrl_id)
-            else
-                return self:get(attr)
-            end
-        elseif key == 'metadata' then
-            local info = rawget(class, self._class)
-            if not info then
-                info = ui_request(OBJECT_METADATA, self._ctrl_id)
-                if info then
-                    class[self._class] = handle_class_info(info)
-                end
-            end
-            rawset(self, 'metadata', info)
-            return info
-        end
-    end
-
     local function WidgetSet(self, key, val)
-        local attr = PROPERTY[key]
-        if attr then
-            if type(attr) == 'number' then
-                return ui_notify(attr, {self._ctrl_id, val})
-            else
-                return self:set(attr, val)
-            end
-        end
         if key:find '^on_' then
             ui_notify(WIDGET_SET_CALLBACK, {self._ctrl_id, {[key] = true}})
         end
@@ -430,35 +371,32 @@ local Widget = {} do
         ui_notify(OBJECT_INVOKE, {self._ctrl_id, method or '', ...})
         return self
     end
-    Widget.__call = WidgetInvoke
-    Widget.invoke = WidgetInvoke
+    Object.__call = WidgetInvoke
+    Object.invoke = WidgetInvoke
 
-    function Widget:call(method, ...)
+    function Object:call(method, ...)
         return ui_request(OBJECT_INVOKE, {self._ctrl_id, method or '', ...})
     end
 
-    function Widget:__index(key)
-        return Widget[key] or WidgetGet(self, key)
-    end
-    Widget.__newindex = WidgetSet
+    Object.__newindex = WidgetSet
 
     ---get OObject's property
     ---@param prop string
     ---@return any
-    function Widget:get(prop)
+    function Object:get(prop)
         return ui_request(OBJECT_GET_PROPERTY, {self._ctrl_id, prop or ''})
     end
 
     ---set OObject's property, return self
     ---@param prop string
     ---@param value any
-    ---@return Widget
-    function Widget:set(prop, value)
+    ---@return Object
+    function Object:set(prop, value)
         ui_notify(OBJECT_SET_PROPERTY, {self._ctrl_id, prop or '', value, false})
         return self
     end
 
-    function Widget:on(signal, callback)
+    function Object:on(signal, callback)
         if not rawget(self, signal) then
             ui_notify(WIDGET_SET_CALLBACK, {self._ctrl_id, {[signal] = true}})
             rawset(self, signal, callback)
@@ -466,40 +404,17 @@ local Widget = {} do
         return self
     end
 
-    function Widget:add_menu(opt)
-        local data2ctrl = ui_request(ADD_MENU, {self._ctrl_id, ui.menu(opt)})
-        handle_root(self, data2ctrl)
-        return opt
-    end
-
-    function Widget:add_action(opt)
-        if type(opt) == 'string' and opt:find('---', 1, true) then
-            opt = opt
-        else
-            opt = ui.action(opt)
-        end
-        local ctrl_id = ui_request(ADD_ACTION, {self._ctrl_id, opt})
-        if type(ctrl_id) == 'number' then
-            opt._ctrl_id = ctrl_id
-            qobj_map[ctrl_id] = opt
-            if self._root then
-                handle_root(self._root, {opt._data_id, ctrl_id, 'QAction'})
-            end
-        end
-        return opt
-    end
-
     ---find child in local cache
     ---@param name string
-    ---@return Widget?
-    function Widget:find(name)
+    ---@return Object?
+    function Object:find(name)
         return self._root.childs[name]
     end
 
     ---find child object by QObject::findChild
     ---@param name string
-    ---@return Widget?
-    function Widget:find_child(name)
+    ---@return Object?
+    function Object:find_child(name)
         local id = ui_request(WIDGET_FIND_CHILD, {self._ctrl_id, name or ''})
         local res = table {}
         if type(id) == 'table' then
@@ -517,15 +432,42 @@ local Widget = {} do
     ---start a timer
     ---@param interval integer @in milliseconds
     ---@return integer @timer id
-    function Widget:start_timer(interval)
+    function Object:start_timer(interval)
         return self:call('startTimer', interval or 1000)
     end
 
     ---kill a timer
     ---@param id integer @timer id
-    function Widget:kill_timer(id)
+    function Object:kill_timer(id)
         self('killTimer', id or 0)
         return self
+    end
+
+    function Object:add_action(opt)
+        if type(opt) == 'string' and opt:find('---', 1, true) then
+            opt = opt
+        else
+            opt = ui.action(opt)
+        end
+        local ctrl_id = ui_request(ADD_ACTION, {self._ctrl_id, opt})
+        if type(ctrl_id) == 'number' then
+            opt._ctrl_id = ctrl_id
+            qobj_map[ctrl_id] = opt
+            if self._root then
+                handle_root(self._root, {opt._data_id, ctrl_id, 'QAction'})
+            end
+        end
+        return opt
+    end
+
+    local QMenu = class {__parent = Object}
+    specialObject.QMenu = QMenu
+    specialObject.menu = QMenu
+
+    function QMenu:add_menu(opt)
+        local data2ctrl = ui_request(ADD_MENU, {self._ctrl_id, ui.menu(opt)})
+        handle_root(self, data2ctrl)
+        return opt
     end
 
     local TABLE_GET = 1101
@@ -535,95 +477,98 @@ local Widget = {} do
     local TABLE_SET_COLOR = 1106
     ui.SET_COLOR = 1106
 
+    local CommonTable = class {__parent = Object}
+    specialObject.table = CommonTable
+
     ---get specific line data
     ---@param l integer|"'.'" @line number, '.' means the selected line
     ---@param c integer @column number, -1 means the last column
     ---@return string|nil
-    function Widget:line(l, c)
+    function CommonTable:line(l, c)
         return ui_request(OBJECT_INVOKE, {self._ctrl_id, TABLE_GET, l or '.', c or -1})
     end
 
-    function Widget:set_line(l, c, data)
+    function CommonTable:set_line(l, c, data)
         ui_notify(OBJECT_INVOKE, {self._ctrl_id, TABLE_SET, assert(l), c, data})
     end
 
     ---append line
     ---@param line string[]
-    function Widget:append(line)
+    function CommonTable:append(line)
         ui_notify(OBJECT_INVOKE, {self._ctrl_id, TABLE_APPEND, assert(line)})
     end
 
-    function Widget:set_color(l, c, fg)
+    function CommonTable:set_color(l, c, fg)
         assert(l and c and fg)
         ui_notify(OBJECT_INVOKE, {self._ctrl_id, TABLE_SET_COLOR, l, c, color[fg] or 0})
     end
 
     ---create a QLabel
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.label(opt)
         return register_ctrl(opt, 'label')
     end
 
     ---create a QPushButton
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.button(opt)
         return register_ctrl(opt, 'button')
     end
 
     ---create a QProgressBar
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.progress(opt)
         return register_ctrl(opt, 'progress')
     end
 
     ---create a QRadioButton
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.radio(opt)
         return register_ctrl(opt, 'radio')
     end
 
     ---create a QCheckBox
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.checkbox(opt)
         return register_ctrl(opt, 'checkbox')
     end
 
     ---create a QComboBox
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.combobox(opt)
         return register_ctrl(opt, 'combobox')
     end
 
     ---create a QLineEdit
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.linetext(opt)
         return register_ctrl(opt, 'text')
     end
 
     ---create a QTextEdit
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.textedit(opt)
         return register_ctrl(opt, 'textedit')
     end
 
     ---create a QDoubleSpinBox/QSpinBox
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.spin(opt)
         return register_ctrl(opt, 'spin')
     end
 
     ---create a QGroupBox
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.groupbox(opt)
         set_childs(opt)
         return register_ctrl(opt, 'groupbox')
@@ -631,7 +576,7 @@ local Widget = {} do
 
     ---create a QDialogButtonBox
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.buttonbox(opt)
         set_childs(opt)
         return register_ctrl(opt, 'buttonbox')
@@ -644,7 +589,7 @@ local Widget = {} do
 
     ---create a CommonTable
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.table(opt)
         return register_ctrl(opt, 'table')
     end
@@ -655,7 +600,7 @@ local Widget = {} do
 
     ---create a QVBoxLayout
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.vbox(opt)
         set_childs(opt)
         return register_ctrl(opt, 'vbox')
@@ -663,7 +608,7 @@ local Widget = {} do
 
     ---create a QHBoxLayout
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.hbox(opt)
         set_childs(opt)
         return register_ctrl(opt, 'hbox')
@@ -671,7 +616,7 @@ local Widget = {} do
 
     ---create a QGridLayout
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.grid(opt)
         set_childs(opt)
         return register_ctrl(opt, 'grid')
@@ -679,7 +624,7 @@ local Widget = {} do
 
     ---create a QFormLayout
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.form(opt)
         set_childs(opt)
         return register_ctrl(opt, 'form')
@@ -701,7 +646,7 @@ local Widget = {} do
 
     ---create a QDialog
     ---@param opt CtrlOpt
-    ---@return Widget
+    ---@return Object
     function ui.dialog(opt)
         opt.layout = opt.layout or 'vbox'
         set_childs(opt)
@@ -773,7 +718,7 @@ local Widget = {} do
         end
     end
 
-    ui.main = register_ctrl {_ctrl_id = 1, _class = 'UDbgWindow'}
+    ui.main = register_ctrl {_ctrl_id = 1, _class = 'UDbgWindow', add_menu = QMenu.add_menu}
 end
 
 do      -- io utils
@@ -907,15 +852,15 @@ do      -- debug view
     local GOTO_PAGE = 14
 
     function ui.goto_cpu(a)
-        ui_notify(GOTO_CPU, EA(a))
+        ui_notify(GOTO_CPU, eval_address(a))
     end
 
     function ui.goto_mem(a)
-        ui_notify(GOTO_MEM, EA(a))
+        ui_notify(GOTO_MEM, eval_address(a))
     end
 
     function ui.goto_page(a)
-        ui_notify(GOTO_PAGE, EA(a))
+        ui_notify(GOTO_PAGE, eval_address(a))
     end
 end
 log, logc, clog = ui.log, ui.logc, ui.clog

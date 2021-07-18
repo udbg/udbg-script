@@ -8,7 +8,7 @@ local MEM = require 'class'.bits {
 }
 
 return function(args)
-    local a = EA(args[1])
+    local a = eval_address(args[1])
     if a then
         log(' ', fmt_addr(a), get_symbol(a), get_symbol(a, 1))
         local m = virtual_query(a)

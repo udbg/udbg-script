@@ -3,8 +3,9 @@ local mod = {}
 
 mod.parser = [[
 e          Edit Memory
-    <address> (string)
+    <address> (address)
     <value>   (string)
+
     -b, --byte
     -w, --word
     -d, --dword
@@ -14,8 +15,7 @@ e          Edit Memory
 ]]
 
 function mod.main(args)
-    local addr = EA(args.address)
-    if not addr then return ui.error('Invaild address') end
+    local addr = args.address
 
     local write = write_bytes
     local value = args.value

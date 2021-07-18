@@ -3,7 +3,7 @@ local mod = {}
 
 mod.parser = [[
 d                           Display Memory
-    <address> (string)      内存地址
+    <address> (address)     内存地址
     <linecount> (default 8) 显示行数
 
     -w, --word
@@ -12,7 +12,7 @@ d                           Display Memory
 ]]
 
 function mod.main(args)
-    local addr = EA(args.address)
+    local addr = args.address
     if not addr then return log('Invaild address') end
 
     local fmt = '%02X'
