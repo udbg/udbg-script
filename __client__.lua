@@ -5,7 +5,7 @@ _ENV.g_client = client
 
 local root_dir = client:get 'root'
 local script_dir = path.join(root_dir, 'script')
-local config_dir = os.env 'UDBG_CONFIG' or path.join(root_dir, 'config')
+local config_dir = args.use_confdir or path.join(root_dir, 'config')
 if not path.exists(config_dir) then
     -- find config directory upward
     local dir = path.dirname(os.getexe())
@@ -48,6 +48,7 @@ local config = {
     data_dir = false,
     plugins = {},
     remote_map = {},
+    show_window = not args.no_window,
 }
 _ENV.g_config = config
 setmetatable(config, {__index = _ENV})
@@ -116,11 +117,16 @@ local function find_lua(...)
     end
 end
 
-local function execute_lua(lua_path, data)
+local function searchpath(mod_path)
+    mod_path = mod_path:gsub('%.', '/')
+    return find_lua(mod_path .. '.lua') or find_lua(mod_path .. '.luac')
+end
+
+local function execute_lua(lua_path, data, mod_path)
     data = data or readfile(lua_path)
     if data then
         -- TODO: bugfix notify
-        g_session:request('lua_execute', {data, lua_path})
+        g_session:request('lua_execute', {data, lua_path, mod_path})
     else
         ui.warn('read', lua_path, 'failed')
     end
@@ -129,15 +135,12 @@ end
 local watch_cache = table {}
 
 local function execute_bin(lua_path, opt)
+    local mod_path
     if not path.isfile(lua_path) then
-        local p = lua_path
-        p = find_lua('udbg', 'bin', p) or
-            find_lua('udbg', 'bin', p .. '.lua') or
-            find_lua('udbg', 'bin', p .. '.luac')
-        if not p then
+        mod_path = 'udbg.bin.' .. lua_path
+        lua_path = searchpath(mod_path)
+        if not lua_path then
             ui.warn(lua_path, 'not found')
-        else
-            lua_path = p
         end
     end
 
@@ -162,7 +165,7 @@ local function execute_bin(lua_path, opt)
                 client:watch(lua_path)
             end
         end
-        execute_lua(lua_path)
+        execute_lua(lua_path, nil, mod_path)
         return lua_path
     elseif opt.edit then
         -- try create this file
@@ -217,8 +220,6 @@ local parser = [[
 end
 
 do  -- rpc service function
-    local searchpath = package.searchpath
-
     local on_ctrl_event = ui.on_ctrl_event
     service.on_ctrl_event = function(args)
         return on_ctrl_event(table.unpack(args))
@@ -230,7 +231,7 @@ do  -- rpc service function
         if name:find('/', 1, true) then
             lua_path = find_lua(name)
         else
-            lua_path = searchpath(name, package.path)
+            lua_path = searchpath(name)
         end
         if lua_path then
             verbose('[require]', lua_path)
@@ -249,6 +250,10 @@ do  -- rpc service function
 
     function service.ui_info()
         return {'qt', root_dir, config.data_dir}
+    end
+
+    function service.config(conf)
+        table.update(config, conf)
     end
 
     function service.fire_event(args)
@@ -320,7 +325,7 @@ do  -- start session
     _ENV.g_shell_args = args
 
     function event.on.ui_inited(map)
-        if not args.no_window then
+        if config.show_window then
             ui.main 'show'
         end
         require 'udbg.client.ui'
@@ -404,10 +409,10 @@ do  -- start session
     end
 
     -- execute lua for shell-args
-    if args.execute then
+    for _, mod_path in ipairs(args.execute) do
         assert(
-            execute_bin(args.execute, {watch = args.watch}),
-            args.execute .. ' not found'
+            execute_bin(mod_path, {watch = args.watch}),
+            mod_path .. ' not found'
         )
     end
 

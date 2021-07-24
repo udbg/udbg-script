@@ -479,6 +479,7 @@ local Object = class {__get = {}} do
 
     local CommonTable = class {__parent = Object}
     specialObject.table = CommonTable
+    specialObject.CommonTable = CommonTable
 
     ---get specific line data
     ---@param l integer|"'.'" @line number, '.' means the selected line

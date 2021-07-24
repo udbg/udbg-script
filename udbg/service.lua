@@ -15,11 +15,17 @@ function service.fire_event(args)
     end
 end
 
-function service.lua_execute(data, path)
-    local ok, r = event.async_call(assert(load(data, path)))
+function service.lua_execute(data, path, mod_path)
+    local ok, r = event.async_call(assert(load(data, '@'..path, 'bt')))
     if ok then
         if #path > 0 then
             ui.info('[lua_execute]', path, 'success')
+        end
+        if mod_path then
+            package.loaded[mod_path] = r or true
+            if type(r) == 'table' then
+                r = true
+            end
         end
         return r
     end
