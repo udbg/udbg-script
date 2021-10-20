@@ -1,6 +1,6 @@
 
 local class = require 'class'
-local PEFile = class {}
+local PEFile = class {__get = {}}
 
 PEFile.readBytes = read_bytes
 
@@ -65,6 +65,24 @@ PEFile.IMAGE_REL_BASED_MACHINE_SPECIFIC_7    = 7
 PEFile.IMAGE_REL_BASED_MACHINE_SPECIFIC_8    = 8
 PEFile.IMAGE_REL_BASED_MACHINE_SPECIFIC_9    = 9
 PEFile.IMAGE_REL_BASED_DIR64                 = 10
+
+PEFile.IMAGE_DEBUG_TYPE_UNKNOWN          = 0
+PEFile.IMAGE_DEBUG_TYPE_COFF             = 1
+PEFile.IMAGE_DEBUG_TYPE_CODEVIEW         = 2
+PEFile.IMAGE_DEBUG_TYPE_FPO              = 3
+PEFile.IMAGE_DEBUG_TYPE_MISC             = 4
+PEFile.IMAGE_DEBUG_TYPE_EXCEPTION        = 5
+PEFile.IMAGE_DEBUG_TYPE_FIXUP            = 6
+PEFile.IMAGE_DEBUG_TYPE_OMAP_TO_SRC      = 7
+PEFile.IMAGE_DEBUG_TYPE_OMAP_FROM_SRC    = 8
+PEFile.IMAGE_DEBUG_TYPE_BORLAND          = 9
+PEFile.IMAGE_DEBUG_TYPE_RESERVED10       = 10
+PEFile.IMAGE_DEBUG_TYPE_CLSID            = 11
+PEFile.IMAGE_DEBUG_TYPE_VC_FEATURE       = 12
+PEFile.IMAGE_DEBUG_TYPE_POGO             = 13
+PEFile.IMAGE_DEBUG_TYPE_ILTCG            = 14
+PEFile.IMAGE_DEBUG_TYPE_MPX              = 15
+PEFile.IMAGE_DEBUG_TYPE_REPRO            = 16
 
 local IMAGE_DIRECTORY_ENTRY =
 {
@@ -177,13 +195,17 @@ end
 
 local function PEMemo_Unpack(self, format, va)
     local ok, size = pcall(format.packsize, format)
-    size = ok and size or 100
-    local data = PEFile.readBytes(self.base + va, size)
-    if data then
-        local result = {format:unpack(data)}
-        local count = #result
-        result[count] = va + size
-        return table.unpack(result)
+    if ok then
+        local data = PEFile.readBytes(self.base + va, size)
+        if data then
+            local result = {format:unpack(data)}
+            local count = #result
+            result[count] = va + size
+            return table.unpack(result)
+        end
+        error('read "'..format..'" @'..hex(self.base + va))
+    else
+        return self.read_pack(self.base + va, format)
     end
 end
 
@@ -199,6 +221,7 @@ function PEFile:__init(opt, type)
         end
     end
 
+    self.read_pack = read_pack
     if type == 'address' then
         self.Unpack = PEMemo_Unpack
         self.base = opt
@@ -231,41 +254,44 @@ function PEFile:__init(opt, type)
     self.sec_pos = self.opt_pos + FileHeader.SizeOfOptionalHeader
 
     -- IMAGE_OPTIONAL_HEADER
+    local opt = {}
     if self.IS64 then
-        self.Magic, self.MajorLinkerVersion, self.MinorLinkerVersion,
-        self.SizeOfCode,
-        self.SizeOfInitializedData,
-        self.SizeOfUninitializedData,
-        self.AddressOfEntryPoint,
-        self.BaseOfCode, self.ImageBase,
-        self.SectionAlignment, self.FileAlignment,
-        self.MajorOperatingSystemVersion,
-        self.MinorOperatingSystemVersion,
-        self.MajorImageVersion, self.MinorImageVersion,
-        self.MajorSubsystemVersion, self.MinorSubsystemVersion,
-        self.Win32VersionValue, self.SizeOfImage, self.SizeOfHeaders,
-        self.CheckSum, self.Subsystem, self.DllCharacteristics,
-        self.SizeOfStackReserve, self.SizeOfStackCommit,
-        self.SizeOfHeapReserve, self.SizeOfHeapCommit,
-        self.LoaderFlags, self.NumberOfRvaAndSizes = self:Unpack(opt_fmt, self.opt_pos)
+        opt.Magic, opt.MajorLinkerVersion, opt.MinorLinkerVersion,
+        opt.SizeOfCode,
+        opt.SizeOfInitializedData,
+        opt.SizeOfUninitializedData,
+        opt.AddressOfEntryPoint,
+        opt.BaseOfCode, opt.ImageBase,
+        opt.SectionAlignment, opt.FileAlignment,
+        opt.MajorOperatingSystemVersion,
+        opt.MinorOperatingSystemVersion,
+        opt.MajorImageVersion, opt.MinorImageVersion,
+        opt.MajorSubsystemVersion, opt.MinorSubsystemVersion,
+        opt.Win32VersionValue, opt.SizeOfImage, opt.SizeOfHeaders,
+        opt.CheckSum, opt.Subsystem, opt.DllCharacteristics,
+        opt.SizeOfStackReserve, opt.SizeOfStackCommit,
+        opt.SizeOfHeapReserve, opt.SizeOfHeapCommit,
+        opt.LoaderFlags, opt.NumberOfRvaAndSizes = self:Unpack(opt_fmt, self.opt_pos)
     else
-        self.Magic, self.MajorLinkerVersion, self.MinorLinkerVersion,
-        self.SizeOfCode,
-        self.SizeOfInitializedData,
-        self.SizeOfUninitializedData,
-        self.AddressOfEntryPoint,
-        self.BaseOfCode, self.BaseOfData, self.ImageBase,
-        self.SectionAlignment, self.FileAlignment,
-        self.MajorOperatingSystemVersion,
-        self.MinorOperatingSystemVersion,
-        self.MajorImageVersion, self.MinorImageVersion,
-        self.MajorSubsystemVersion, self.MinorSubsystemVersion,
-        self.Win32VersionValue, self.SizeOfImage, self.SizeOfHeaders,
-        self.CheckSum, self.Subsystem, self.DllCharacteristics,
-        self.SizeOfStackReserve, self.SizeOfStackCommit,
-        self.SizeOfHeapReserve, self.SizeOfHeapCommit,
-        self.LoaderFlags, self.NumberOfRvaAndSizes = self:Unpack(opt_fmt, self.opt_pos)
+        opt.Magic, opt.MajorLinkerVersion, opt.MinorLinkerVersion,
+        opt.SizeOfCode,
+        opt.SizeOfInitializedData,
+        opt.SizeOfUninitializedData,
+        opt.AddressOfEntryPoint,
+        opt.BaseOfCode, opt.BaseOfData, opt.ImageBase,
+        opt.SectionAlignment, opt.FileAlignment,
+        opt.MajorOperatingSystemVersion,
+        opt.MinorOperatingSystemVersion,
+        opt.MajorImageVersion, opt.MinorImageVersion,
+        opt.MajorSubsystemVersion, opt.MinorSubsystemVersion,
+        opt.Win32VersionValue, opt.SizeOfImage, opt.SizeOfHeaders,
+        opt.CheckSum, opt.Subsystem, opt.DllCharacteristics,
+        opt.SizeOfStackReserve, opt.SizeOfStackCommit,
+        opt.SizeOfHeapReserve, opt.SizeOfHeapCommit,
+        opt.LoaderFlags, opt.NumberOfRvaAndSizes = self:Unpack(opt_fmt, self.opt_pos)
     end
+    table.update(self, opt)
+    self.OptionalHeader = opt
 end
 
 function PEFile:GetDataDirectory(which)
@@ -306,64 +332,121 @@ function PEFile:GetRelocInfo()
     return result
 end
 
-function PEFile:GetExportDirectory()
-    if not self.export_directory then
-        local export_data = self:GetDataDirectory 'EXPORT'
-        if export_data.VirtualAddress == 0 then return end
-        -- IMAGE_EXPORT_DIRECTORY
-        local exp = {} self.export_directory = exp
-        exp.Characteristics,
-        exp.TimeDateStamp,
-        exp.MajorVersion, exp.MinorVersion,
-        exp.Name, exp.Base,
-        exp.NumberOfFunctions, exp.NumberOfNames,
-        exp.AddressOfFunctions, exp.AddressOfNames,
-        exp.AddressOfNameOrdinals = self:Unpack('I4I4I2I2I4I4I4I4I4I4I4', export_data.VirtualAddress)
+function PEFile.__get:SectionList()
+    local offset = self.sec_pos
+    local base = self:GetBase()
+    local result = {}
+    for i = 1, self.FileHeader.NumberOfSections do
+        local item = {}
+        item.Name, item.VirtualSize,
+        item.VirtualAddress,
+        item.SizeOfRawData,
+        item.PointerToRawData,
+        item.PointerToRelocations,
+        item.PointerToLinenumbers,
+        item.NumberOfRelocations,
+        item.NumberOfLinenumbers,
+        item.Characteristics,
+        offset = self:Unpack('c8I4I4I4I4I4I4I2I2I4', offset)
+
+        item.Name = item.Name:gsub('\0.*$', '')
+        item.Address = item.VirtualAddress + base
+        table.insert(result, item) result[item.Name] = item
     end
-    return self.export_directory
+    self.SectionList = result
+    return result
+end
+
+function PEFile.__get:ExportDirectory()
+    local export_data = self:GetDataDirectory 'EXPORT'
+    if export_data.VirtualAddress == 0 then return end
+    -- IMAGE_EXPORT_DIRECTORY
+    local ok, exp = false, {}
+    ok, exp.Characteristics,
+    exp.TimeDateStamp,
+    exp.MajorVersion, exp.MinorVersion,
+    exp.Name, exp.Base,
+    exp.NumberOfFunctions, exp.NumberOfNames,
+    exp.AddressOfFunctions, exp.AddressOfNames,
+    exp.AddressOfNameOrdinals = pcall(self.Unpack, self, 'I4I4I2I2I4I4I4I4I4I4I4', export_data.VirtualAddress)
+    if ok then
+        self.ExportDirectory = exp
+        return exp
+    end
+end
+
+function PEFile.__get:ExportList()
+    -- IMAGE_EXPORT_DIRECTORY
+    local exp = self.ExportDirectory
+    if not exp then return end
+    local names = exp.AddressOfNames
+    local oridinals = exp.AddressOfNameOrdinals
+    local functions = exp.AddressOfFunctions
+    -- printx(names, oridinals, functions)
+    local base = self:GetBase()
+    local result = {}
+    for i = 0, exp.NumberOfNames - 1 do
+        local item = {}
+        item.NameRVA = self:Unpack('I4', names + i * 4)
+        item.Name = self:Unpack('z', item.NameRVA)
+        item.Number = self:Unpack('I2', oridinals + i * 2)
+        item.VirtualAddress = self:Unpack('I4', functions + item.Number * 4)
+        if item.VirtualAddress == 0 then break end
+        item.Address = base + item.VirtualAddress
+        table.insert(result, item)
+    end
+    self.ExportList = result
+    return result
 end
 
 function PEFile:GetExportInfo(i, exp)
-    if i then
-        exp = exp or self:GetExportDirectory()
-        local item = {}
-        local base = self:GetBase()
-        item.NameRVA = self:Unpack('I4', exp.AddressOfNames + i * 4)
-        item.Name = self:Unpack('z', item.NameRVA)
-        item.Number = self:Unpack('I2', exp.AddressOfNameOrdinals + i * 2)
-        item.VirtualAddress = self:Unpack('I4', exp.AddressOfFunctions + item.Number * 4)
-        item.Address = base + item.VirtualAddress
-        return item
-    else
-        if self.export_list then return self.export_list end
-        local export_data = self:GetDataDirectory 'EXPORT'
-        if export_data.VirtualAddress == 0 then return end
+    exp = exp or self.ExportDirectory
+    local item = {}
+    local base = self:GetBase()
+    item.NameRVA = self:Unpack('I4', exp.AddressOfNames + i * 4)
+    item.Name = self:Unpack('z', item.NameRVA)
+    item.Number = self:Unpack('I2', exp.AddressOfNameOrdinals + i * 2)
+    item.VirtualAddress = self:Unpack('I4', exp.AddressOfFunctions + item.Number * 4)
+    item.Address = base + item.VirtualAddress
+    return item
+end
 
-        -- IMAGE_EXPORT_DIRECTORY
-        exp = self:GetExportDirectory()
-        local names = exp.AddressOfNames
-        local oridinals = exp.AddressOfNameOrdinals
-        local functions = exp.AddressOfFunctions
-        -- printx(names, oridinals, functions)
-        local base = self:GetBase()
-        local result = {}
-        for i = 0, exp.NumberOfNames - 1 do
-            local item = {}
-            item.NameRVA = self:Unpack('I4', names + i * 4)
-            item.Name = self:Unpack('z', item.NameRVA)
-            item.Number = self:Unpack('I2', oridinals + i * 2)
-            item.VirtualAddress = self:Unpack('I4', functions + item.Number * 4)
-            if item.VirtualAddress == 0 then break end
-            item.Address = base + item.VirtualAddress
-            table.insert(result, item)
-        end
-        self.export_list = result
-        return result
+function PEFile.__get:DebugDirectory()
+    local dd = self:GetDataDirectory 'DEBUG'
+    if dd.VirtualAddress == 0 then return end
+    -- MAGE_DEBUG_DIRECTORY
+    local res = {}
+    res.Characteristics,
+    res.TimeDateStamp,
+    res.MajorVersion,
+    res.MinorVersion,
+    res.Type,
+    res.SizeOfData,
+    res.AddressOfRawData,
+    res.PointerToRawData = self:Unpack('I4I4I2I2I4I4I4I4', dd.VirtualAddress)
+    self.DebugDirectory = res
+    return res
+end
+
+function PEFile.__get:DebugInfo()
+    local dd = self.DebugDirectory
+    if dd and dd.Type == PEFile.IMAGE_DEBUG_TYPE_CODEVIEW then
+        local offset
+        local res = {}
+        res.codeview_signature,
+        res.signature,
+        res.age, offset = self:Unpack('I4c16I4', dd.AddressOfRawData)
+        res.name = PEFile.readBytes(self.base + offset, dd.SizeOfData - 24 - 1)
+        -- if res.name then res.name = res.name:gsub('\0.*', '') end
+        -- GUID struct
+        local data1, data2, data3, data4 = ('I4I2I2c8'):unpack(res.signature)
+        res.pdb_signature = ('%08X%04X%04X%s%X'):format(data1, data2, data3, data4:tohex():upper(), res.age)
+        self.DebugInfo = res
+        return res
     end
 end
 
-function PEFile:GetImportInfo()
-    if self.import_list then return self.import_list end
+function PEFile.__get:ImportList()
     local import_data = self:GetDataDirectory 'IMPORT'
     if import_data.VirtualAddress == 0 then return end
 
@@ -371,18 +454,19 @@ function PEFile:GetImportInfo()
     local offset = import_data.VirtualAddress
     local result = {}
     for i = 1, import_data.Size // imp_fmt:packsize() do
-        local item = {}
-        item.Characteristics,
+        local ok, item = false, {}
+        ok, item.Characteristics,
         item.TimeDateStamp,
         item.ForwarderChain,
         item.NameRVA, item.FirstThunk,
-        offset = self:Unpack(imp_fmt, offset)
-        if item.FirstThunk == 0 then break end
+        offset = pcall(self.Unpack, self, imp_fmt, offset)
+        if not ok or item.FirstThunk == 0 then break end
 
         item.OriginalFirstThunk = item.Characteristics
         item.Name = self:Unpack('z', item.NameRVA)
         table.insert(result, item)
     end
+    self.ImportList = result
     return result
 end
 
@@ -399,7 +483,7 @@ function PEFile:EachImportItem(import)
         if rva == 0 then return end
 
         local result = {}
-        if rva & original_flag > 0 then
+        if rva & original_flag ~= 0 then
             -- Import by number
             result.Number = rva & 0x7FFFFFFFFFFFFFFF
         else
@@ -412,39 +496,8 @@ function PEFile:EachImportItem(import)
     end
 end
 
-function PEFile:GetSectionInfo(name)
-    if not self.section_list then
-        local offset = self.sec_pos
-        local base = self:GetBase()
-        local result = {}
-        for i = 1, self.FileHeader.NumberOfSections do
-            local item = {}
-            item.Name, item.VirtualSize,
-            item.VirtualAddress,
-            item.SizeOfRawData,
-            item.PointerToRawData,
-            item.PointerToRelocations,
-            item.PointerToLinenumbers,
-            item.NumberOfRelocations,
-            item.NumberOfLinenumbers,
-            item.Characteristics,
-            offset = self:Unpack('c8I4I4I4I4I4I4I2I2I4', offset)
-
-            item.Name = item.Name:gsub('\0.*$', '')
-            item.Address = item.VirtualAddress + base
-            table.insert(result, item) result[item.Name] = item
-        end
-        self.section_list = result
-    end
-    if name then
-        return self.section_list[name]
-    else
-        return self.section_list
-    end
-end
-
 function PEFile:VA2Offset(VirtualAddress)
-    for i, section in ipairs(self:GetSectionInfo()) do
+    for i, section in ipairs(self.SectionList) do
         local offset = VirtualAddress - section.VirtualAddress
         -- if offset >= 0 and offset < section.SizeOfRawData then
         if offset >= 0 and offset < section.VirtualSize then
@@ -470,6 +523,7 @@ function PEFile.FromAddress(address)
     return PEFile(address)
 end
 
+--[[
 function PEFile:PrintHeader()
     print('             Magic', PEFile.Magic[self.Magic])
     print('           Machine', PEFile.Machine[self.Machine])
@@ -482,17 +536,6 @@ function PEFile:PrintHeader()
     print('DllCharacteristics', PEFile.DllCharacteristics[self.DllCharacteristics])
     print('SizeOfOptionalHeader', hex(self.SizeOfOptionalHeader))
 end
-
-function PEFile:PrintExport()
-    table.foreach(self:GetExportInfo() or {}, function(item)
-        print(item.Number, hex(item.VirtualAddress), hex(item.Address), item.Name)
-    end)
-end
-
-function PEFile:PrintSection()
-    table.foreach(self:GetSectionInfo(), function(item)
-        print(hex(item.VirtualAddress), hex(item.VirtualSize), item.Name)
-    end)
-end
+]]
 
 return PEFile

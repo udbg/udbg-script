@@ -20,14 +20,19 @@ function t.spawn(callback, opt)
 
     opt.thread = thread.spawn(function()
         opt.coroutine = coroutine.running()
+        require 'udbg.luadebug'.add(opt.coroutine)
         local ok, err = xpcall(callback, debug.traceback, opt)
         if not ok then
             require 'udbg.ui'.error('[task]', opt.name, err)
         end
-        opt.abort = true
+        if opt.finally then
+            opt:finally()
+            opt.finally = nil
+        end
+        opt.aborted = true
         local i = table.find(t.running, opt)
         if i then table.remove(t.running, i) end
-    end)
+    end, opt.name)
     opt.start_time = os.date '%c'
     table.insert(t.running, opt)
     return opt

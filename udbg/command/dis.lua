@@ -51,9 +51,9 @@ local function output(fmt, arr, show_op)
             addr = addr:gsub('^..', '->')
             if not sym then sym = get_symbol(address) end
         end
-        if sym then logc('blue', sym .. ':\n') end
-        logc('gray', addr)
-        logc('yellow', fmt:format(d.bytes:tohex()))
+        if sym then ui.logc('blue', sym .. ':\n') end
+        ui.logc('gray', addr)
+        ui.logc('yellow', fmt:format(d.bytes:tohex()))
         log('', d.string)
 
         if show_op then
@@ -73,7 +73,7 @@ function mod.main(args)
         return
     end
     local m = get_module(address)
-    local arch = m and m.arch or __llua_arch
+    local arch = m and m.arch or os.arch
     local a1, mode
     if args.x64 then arch = 'x86_64'
     elseif args.x86 then arch = 'x86'
@@ -86,7 +86,7 @@ function mod.main(args)
     elseif arch == 'arm' then a1, mode = 'arm', 'arm'
     elseif arch == 'aarch64' or arch == 'arm64' then a1 = 'arm64' end
 
-    local cs = capstone(a1, mode)
+    local cs = Capstone.new(a1, mode)
     local fmt = arch:find 'x86' and '%-16s' or '%-10s'
 
     local up = args.upward
@@ -105,12 +105,12 @@ function mod.main(args)
     output(fmt, discount(cs, address, args.count), args.operand)
     -- while count < args.count do
     --     local sym = get_symbol(address, 0)
-    --     if sym then logc('blue', sym .. ':\n') end
+    --     if sym then ui.logc('blue', sym .. ':\n') end
 
     --     local d = cs:disasm(address)
     --     local bytes = d.bytes
-    --     logc('gray', ('%14s '):format(fmt_addr(address)))
-    --     logc('yellow', fmt:format(bytes:tohex()))
+    --     ui.logc('gray', ('%14s '):format(fmt_addr(address)))
+    --     ui.logc('yellow', fmt:format(bytes:tohex()))
     --     log('', d.string)
     --     count = count + 1
     --     address = address + #bytes

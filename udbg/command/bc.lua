@@ -2,10 +2,13 @@
 return function(args)
     local address = args[1]
     if address == '*' then
-        for _, id in ipairs(get_bp_list()) do
-            del_bp(id)
+        for _, bp in ipairs(breakpoint_list()) do
+            bp:remove()
         end
     else
-        del_bp(address)
+        local bp = get_breakpoint(address)
+        if bp then
+            bp:remove()
+        end
     end
 end

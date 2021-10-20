@@ -6,7 +6,13 @@ local unpack = table.unpack
 local rawset = rawset
 local xpcall, type = xpcall, type
 local traceback = debug.traceback
-local ui_notify, ui_request = ui_notify, ui_request
+local ucmd = require 'udbg.cmd'
+
+local session = ui_session
+if not session then return end
+local notify, request = session.notify, session.request
+local function ui_notify(method, ...) return notify(session, method, ...) end
+local function ui_request(method, ...) return request(session, method, ...) end
 
 local color = {
     [''] = 0, green = 1, blue = 2, gray = 3,
@@ -67,7 +73,7 @@ end
 
 local ui = {
     notify = ui_notify, request = ui_request,
-    color = color,
+    session = session, color = color,
     TreeItem = TreeItem,
 
     -- Qt::Orientation
@@ -160,23 +166,9 @@ do
     }
 end
 
----run a function in client
----@param fun function
-function ui.call(fun, request)
-    local ups = table {string.dump(fun)}
-    for i = 2, 100 do
-        local n, v = debug.getupvalue(fun, i)
-        if not n then break end
-        -- print('upval', n)
-        ups:insert(v)
-    end
-    if request then
-        return ui_request('call', ups)
-    end
-    ui_notify('call', ups)
-end
-
 do      -- ui utils
+    local tostring = tostring
+
     function ui.save_path(opt)
         opt = opt or {}
         opt.type = 'file'
@@ -185,23 +177,41 @@ do      -- ui utils
         return ui.input(opt)
     end
 
-    local INFO = 3
-    local LOG = 4
-    local WARN = 5
-    local ERROR = 6
-    local LOG_COLOR = 28
+    local INFO<const> = 3
+    local LOG<const> = 4
+    local WARN<const> = 5
+    local ERROR<const> = 6
+    local LOG_COLOR<const> = 28
     local concat = string.concat
-    function ui.info(...) ui_notify(INFO, concat(...)) end
-    function ui.log(...) ui_notify(LOG, concat(...)) end
-    function ui.warn(...) ui_notify(WARN, concat(...)) end
-    function ui.error(...) ui_notify(ERROR, concat(...)) end
 
-    local tostring = tostring
-    function ui.logc(c, t, width)
-        ui_notify(LOG_COLOR, {color[c] or c, tostring(t), width})
-    end
-    function ui.log_color_line(line)
-        ui_notify(LOG_COLOR, line)
+    if _G.log then
+        ui.log, ui.info, ui.warn, ui.error = log.log, log.info, log.warn, log.error
+        ui.logc = log.color
+    else
+        function ui.info(...) ui_notify(INFO, concat(...)) end
+        function ui.log(...) ui_notify(LOG, concat(...)) end
+        function ui.warn(...) ui_notify(WARN, concat(...)) end
+        function ui.error(...) ui_notify(ERROR, concat(...)) end
+
+        local log = {}
+        _G.log = log
+        setmetatable(log, log)
+
+        function ui.logc(c, t, width)
+            ui_notify(LOG_COLOR, {color[c] or c, tostring(t), width})
+        end
+
+        function log:__call(...)
+            return ui_notify(INFO, concat(...))
+        end
+
+        function log.color_line(line)
+            ui_notify(LOG_COLOR, line)
+        end
+
+        log.log, log.warn, log.info, log.error = ui.log, ui.warn, ui.info, ui.error
+        log.color = ui.logc
+        log.colormap = color
     end
     function ui.clog(args)
         local sep = args.sep or ' '
@@ -237,6 +247,7 @@ end
 ---@field private _root Object
 ---@field childs Object[]
 local Object = class {__get = {}} do
+    ui.Object = Object
     local weak_value = {__mode = 'v'}
     ---@type table<integer, Object>
     local data_map = {}     -- data_id -> ctrl_data
@@ -252,6 +263,10 @@ local Object = class {__get = {}} do
     local OBJECT_INVOKE<const> = 1712
     local OBJECT_GET_PROPERTY<const> = 1713
     local OBJECT_SET_PROPERTY<const> = 1714
+
+    ui.OBJECT_INVOKE = OBJECT_INVOKE
+    ui.OBJECT_GET_PROPERTY = OBJECT_GET_PROPERTY
+    ui.OBJECT_SET_PROPERTY = OBJECT_SET_PROPERTY
 
     local ADD_MENU = 1800
     local ADD_ACTION = 1801
@@ -374,6 +389,14 @@ local Object = class {__get = {}} do
     Object.__call = WidgetInvoke
     Object.invoke = WidgetInvoke
 
+    function Object:__init(opt)
+        if type(opt) == 'string' then
+            self._ctrl_id = opt
+        else
+            table.update(self, opt)
+        end
+    end
+
     function Object:call(method, ...)
         return ui_request(OBJECT_INVOKE, {self._ctrl_id, method or '', ...})
     end
@@ -443,13 +466,13 @@ local Object = class {__get = {}} do
         return self
     end
 
-    function Object:add_action(opt)
+    function Object:add_action(opt, default)
         if type(opt) == 'string' and opt:find('---', 1, true) then
             opt = opt
         else
             opt = ui.action(opt)
         end
-        local ctrl_id = ui_request(ADD_ACTION, {self._ctrl_id, opt})
+        local ctrl_id = ui_request(ADD_ACTION, {self._ctrl_id, opt, default})
         if type(ctrl_id) == 'number' then
             opt._ctrl_id = ctrl_id
             qobj_map[ctrl_id] = opt
@@ -458,6 +481,22 @@ local Object = class {__get = {}} do
             end
         end
         return opt
+    end
+
+    function Object:context_actions(actions)
+        assert(type(actions) == 'table' and actions[1])
+        ui_notify(ADD_ACTION, {self._ctrl_id, actions})
+
+        local cb = {}
+        for _, item in ipairs(actions) do
+            if item.name then
+                cb[item.name] = item.on_trigger
+            end
+        end
+        function self:on_contextAction(name)
+            local callback = cb[name]
+            return callback and callback(self, name)
+        end
     end
 
     local QMenu = class {__parent = Object}
@@ -729,15 +768,6 @@ do      -- io utils
     local WRITE_FILE<const> = 32
     local CLOSE_FILE<const> = 33
 
-    local OPEN_PROGRAM<const> = 40
-    local READ_STDOUT<const> = 41
-    local READ_STDERR<const> = 42
-    local WRITE_STDIN<const> = 43
-    local WAIT_PROGRAM<const> = 44
-    local KILL_PROGRAM<const> = 45
-    local CLOSE_PROGRAM<const> = 46
-    local WAIT_OUTPUT<const> = 47
-
     local READ_THE_FILE<const> = 1003
 
     local File = {}
@@ -759,39 +789,6 @@ do      -- io utils
     end
     File.__gc = File.close
     File.__close = File.close
-
-    local Child = {}
-    Child.__index = Child
-
-    function Child:read(size)
-        return ui_request(READ_STDOUT, {self.__id, size})
-    end
-
-    function Child:read_stderr(size)
-        return ui_request(READ_STDERR, {self.__id, size})
-    end
-
-    function Child:wait()
-        return ui_request(WAIT_PROGRAM, {self.__id, false})
-    end
-
-    function Child:try_wait()
-        return ui_request(WAIT_PROGRAM, {self.__id, true})
-    end
-
-    function Child:wait_output()
-        local res = ui_request(WAIT_OUTPUT, self.__id)
-        self.__id = nil
-        res.status = res[1]
-        res.stdout = res[2]
-        res.stderr = res[3]
-        return res
-    end
-
-    function Child:__gc()
-        ui_notify(CLOSE_PROGRAM, self.__id)
-        self.__id = nil
-    end
 
     -- make a directory
     ---@param dir string
@@ -828,42 +825,489 @@ do      -- io utils
     function ui.openfile(path, write)
         return setmetatable({__id = ui_request(OPEN_FILE, {path, write or false})}, File)
     end
+end
 
-    function ui.program(opt)
-        if type(opt) ~= 'table' then
-            opt = {opt}
+local json = require 'cjson'
+local event = require 'udbg.event'
+
+local thread = thread
+local cond = thread.condvar()
+
+function ui.pause(reason)
+    -- TODO: console mode
+    ui.g_status:set('text', reason or 'Paused')
+    ui.stack.address = reg._sp
+    ui.view_regs('setRegs', udbg.target:register())
+    ui.view_disasm:set('pc', reg._pc)
+    ui.goto_cpu(reg._pc)
+    ui.main 'alertWindow'
+    local r = cond:wait()
+    ui.view_disasm:set('pc', 0)
+    ui.g_status:set('text', 'Running')
+
+    return table.unpack(r)
+end
+
+function ui.continue(a, b)
+    cond:notify_one {a, b}
+end
+
+function ui.goto_cpu(a)
+    ui.view_disasm:set('address', type(a) == 'string' and eval_address(a) or a)
+    ui.Object 'dockCpu' 'raise'
+    ui.view_disasm 'setFocus'
+end
+
+function ui.goto_mem(a)
+    ui.view_mem:set('address', type(a) == 'string' and eval_address(a) or a)
+    ui.Object 'dockMemory' 'raise'
+    ui.view_mem 'setFocus'
+end
+
+function ui.goto_page(a)
+    a = type(a) == 'string' and eval_address(a) or a
+    local data = ui.update_memory_layout()
+    if data then
+        local i = table.binary_search(data, a, function(m, a)
+            if a < m.base then return 1 end
+            if a >= m.base + m.size then return -1 end
+            return 0
+        end)
+        if i then
+            ui.memoryLayout:set('scrollTo', i - 1)
+            ui.Object 'dockMemoryLayout' 'raise'
         end
+    end
+end
 
-        local args = opt
-        local res = ui_request(OPEN_PROGRAM, {
-            args,
-            opt.stdout ~= nil and opt.stdout or false,
-            opt.stderr ~= nil and opt.stderr or false,
-            opt.stdin ~= nil and opt.stdin or false,
+local units = {"K", "M", "G", "T"}
+function ui.humanSize(size)
+    local i = 0
+    while size > 1024 do
+        size = size / 1024
+        i = i + 1
+    end
+    local unit = units[i]
+    return unit and ('%.1f %s'):format(size, unit) or tostring(size)
+end
+
+function ui.update_memory_layout()
+    if not udbg.target then return end
+    local data = table {}
+    local format = string.format
+    for _, m in ipairs(get_memory_map()) do
+        local usage = m.usage
+        if usage == 'PEB' then
+            usage = {text = usage, fg = 'darkRed'}
+        elseif usage:startswith 'Stack' then
+            usage = {text = usage, fg = 'darkGreen'}
+        elseif usage:startswith 'Heap' then
+            usage = {text = usage, fg = 'darkMagenta'}
+        end
+        local size = m.size
+        size = format('%x (%s)', size, ui.humanSize(size))
+        local item = {fmt_addr(m.base), size, m.type, m.protect, usage}
+        item.base = m.base
+        item.size = m.size
+        data:insert(item)
+    end
+    ui.memoryLayout:set('data', data)
+    return data
+end
+
+function ui.update_handle_list()
+    local target = udbg.target
+    if not target then return end
+    local data = table {}
+    local format = string.format
+    for handle, type_index, type_name, name in target:enum_handle() do
+        data:insert {type_name, type_index, format('%x', handle), name}
+    end
+    ui.view_handle:set('data', data)
+    return data
+end
+
+function ui.update_module_list()
+    local target = udbg.target
+    -- stateconfig('exception', false)
+    if not target then return end
+    local data = table {}
+    for m in target:enum_module() do
+        data:insert {m.name, fmt_addr(m.base), hex(m.size), fmt_addr(m.base + m.entry), m.arch, m.path, m'pdb_path'}
+    end
+    ui.view_module:set('data', data)
+end
+
+local last_bplist = {}
+function ui.update_bp_list()
+    local target = udbg.target
+    if not target then return end
+    last_bplist = target:breakpoint_list()
+    local data = table {}
+    for i, bp in ipairs(last_bplist) do
+        data:insert {target:fmt_addr_sym(bp.address), bp.type, bp.enabled, bp.hitcount}
+    end
+    ui.Object 'bplist':set('data', data)
+end
+
+local windows = os.name == 'windows'
+function ui.update_thread_list()
+    local target = udbg.target
+    if not target then return end
+    local data = table {}
+    for tid, t in pairs(target:thread_list()) do
+        if windows then
+            local entry = t.entry
+            local ok, suspend_count = pcall(t.suspend, t)
+            local pc = t('reg', '_pc') or 0
+            data:insert {
+                tid, target:fmt_addr_sym(entry), fmt_addr(t.teb or 0),
+                target:fmt_addr_sym(pc), t.status, t.priority, ok and suspend_count or -1,
+                hex(t:last_error(target)), t.name,
+            }
+            if ok then t:resume() end
+        else
+        end
+    end
+    table.sort(data, function(a, b) return a[1] < b[1] end)
+    ui.view_thread:set('data', data)
+end
+
+local update_thread
+local to_update = {}
+local updater = {
+    module = ui.update_module_list,
+    bplist = ui.update_bp_list,
+    thread = ui.update_thread_list,
+    handle = ui.update_handle_list,
+    memoryLayout = ui.update_memory_layout,
+}
+function ui.update_view(what)
+    if update_thread then
+        to_update[what] = true
+        return
+    end
+    if not udbg.target then
+        return
+    end
+    update_thread = require'udbg.task'.spawn(function()
+        while udbg.target do
+            for key, value in pairs(to_update) do
+                local fun = updater[key]
+                if fun then
+                    local ok, err = xpcall(fun, debug.traceback)
+                    if not ok then
+                        ui.error('[update %s]' % key, err)
+                    end
+                end
+            end
+            to_update = {}
+            thread.sleep(10)
+        end
+        update_thread = false
+    end, {name = 'view-update'})
+    return ui.update_view(what)
+end
+
+function ui.stop_target()
+    if udbg.target then
+        udbg.target:kill()
+    end
+    if udbg.target then
+        ui.continue 'run'
+    end
+end
+
+function ui.detach_target()
+    if udbg.target then
+        udbg.target:detach()
+        ui.continue 'run'
+    end
+end
+
+function ui.restart_target()
+    ui.stop_target()
+    require'udbg.task'.spawn(function()
+        for _ = 1, 200 do
+            if not udbg.target then break end
+            thread.sleep(10)
+        end
+        if udbg.target then
+            ui.error('[restart]', 'kill target failed')
+        else
+            udbg.start(udbg.dbgopt)
+        end
+    end)
+end
+
+function event.on.uiInited()
+    ui.view_module, ui.view_pages, ui.view_thread,
+    ui.view_regs, ui.view_disasm, ui.memoryLayout,
+    ui.view_handle, ui.view_mem, ui.menu_file,
+    ui.menu_view, ui.menu_option, ui.menu_help,
+    ui.menu_plugin, ui.g_status, ui.view_bplist = ui.main:find_child {
+        'module', 'memoryLayout', 'thread',
+        'regs', 'disasm', 'memoryLayout',
+        'handle', 'memory', 'menuFile',
+        'menuView', 'menuOption', 'menuHelp',
+        'menuPlugin', 'status', 'bplist',
+    }
+    ui.view_module:add_action {
+        title = '&Dump', on_trigger = function()
+            local m = ui.view_module:line('.', 0)
+            local path = ui.save_path {title = 'Save "'..m..'" To'}
+            if path then
+                ucmd {'dump-memory', '-m', m, path}
+            end
+        end
+    }
+
+    local lastrunning = {__mode = 'v'}
+    setmetatable(lastrunning, lastrunning)
+    ui.menu_help:add_menu {separator = true, index = 0}
+    ui.view_task = ui.menu_help:add_menu {
+        title = 'Tas&k', index = 0;
+
+        on_trigger = function(self, name)
+            local i = tonumber(name:match('%d+'))
+            local task = lastrunning[i]
+            log.info('try abort task:', i, task.name)
+            require 'udbg.task'.try_abort(task)
+        end,
+        on_show = function(self)
+            table.clear(lastrunning)
+            self 'clear'
+            for i, task in ipairs(require 'udbg.task'.running) do
+                lastrunning[i] = task
+                self:add_action {title = '&' .. i .. '. ' .. task.name}
+            end
+        end,
+    }
+
+    if windows then
+        local view_thread = ui.view_thread
+        view_thread:set('columns', {
+            {name = 'TID', width = 6},
+            {name = 'Entry', width = 30},
+            {name = 'TEB', width = 14},
+            {name = 'PC', width = 30},
+            {name = 'Status', width = 18},
+            {name = 'Priority', width = 8},
+            {name = 'Suspend Count', width = 4},
+            {name = 'Last Error', width = 10},
+            {name = 'Name', width = 15},
         })
-        res.__id = res[1]
-        res.pid = res[2]
-        return setmetatable(res, Child)
+        view_thread:context_actions {
+            {
+                name = 'Goto TEB', on_trigger = function()
+                    local a = parse_address(view_thread:line('.', 'TEB'))
+                    ui.goto_mem(a)
+                end
+            },
+            {
+                name = 'Goto PC', on_trigger = function()
+                    local a = parse_address(view_thread:line('.', 'PC'):match'%x+')
+                    ui.goto_cpu(a)
+                end
+            },
+            {
+                name = '&Suspend', on_trigger = function()
+                    local tid = tonumber(view_thread:line('.', 'TID'))
+                    open_thread(tid):suspend()
+                end
+            },
+            {
+                name = '&Resume', on_trigger = function()
+                    local tid = tonumber(view_thread:line('.', 'TID'))
+                    open_thread(tid):resume()
+                end
+            },
+            {
+                name = 'Stac&k', on_trigger = function()
+                    ucmd('k ' .. view_thread:line('.', 0))
+                end
+            },
+            {
+                name = 'Stack(&Fuzzy)', on_trigger = function()
+                    ucmd('stack ' .. view_thread:line('.', 0))
+                end
+            },
+        }
+
+        ucmd.register('stack', function(args)
+            local function echo(tid, th)
+                if th then
+                    th:suspend()
+                    local sp = hex(th('reg', '_sp'))
+                    log('[stack] ' .. tid .. ' sp: ' .. sp)
+                    ucmd('dp -r ' .. sp .. ' 30')
+                    th:resume()
+                end
+            end
+            local tid = args[1]
+            if tid == '*' then
+                for tid, th in pairs(thread_list()) do
+                    echo(tid, th)
+                end
+            else
+                tid = tonumber(tid)
+                echo(tid, open_thread(tid))
+            end
+        end)
+    end
+
+    ui.menu_option:add_action {
+        title = 'Command &Cache', checked = true,
+        on_trigger = function(self, val) ucmd.use_cache = val end
+    }
+    ui.menu_option:add_menu {separator = true}
+    ui.menu_option:add_action {
+        title = '&Option',
+        on_trigger = ucmd.wrap 'config',
+    }
+
+    ui.view_bplist:context_actions {
+        {
+            name = '&Enable/Disable', shortcut = 'space';
+            on_trigger = function()
+                local bp = last_bplist[ui.view_bplist:get 'currentLine'.index + 1]
+                if bp then
+                    bp.enabled = not bp.enabled
+                    ui.update_bp_list()
+                end
+            end
+        },
+        {
+            name = '&Delete', shortcut = 'delete';
+            on_trigger = function()
+                local bp = last_bplist[ui.view_bplist:get 'currentLine'.index + 1]
+                if bp then
+                    bp:remove()
+                    ui.update_bp_list()
+                end
+            end
+        }
+    }
+end
+
+event.on('uiInited', coroutine.create(function()
+    if udbg.dbgopt.target then
+        udbg.start(udbg.dbgopt)
+    end
+end), {order = 10000})
+
+function ui.load_target_data()
+    local path = __data_dir..'/config.json'
+    data = ui.readfile(path)
+    if data then
+        ui.info('[config]', 'load', path)
+        table.update(udbg.config, json.decode(data))
+    end
+    if udbg.target:status() == 'opened' then
+        __config.backup_breakpoint = false
+    end
+
+    if __config.backup_breakpoint then
+        local path = __data_dir..'/bplist.json'
+        local data = ui.readfile(path)
+        if data then
+            ui.info('[bplist]', 'load', path)
+            for m, list in pairs(json.decode(data)) do
+                module_callback(m, function(m)
+                    for _, item in ipairs(list) do
+                        local a = item.symbol and parse_address(item.symbol) or m.base + item.rva
+                        ui.info('[bp]', hex_line(item))
+                        add_bp(a, {type = item.type, enable = item.enable})
+                    end
+                end)
+            end
+        end
     end
 end
 
-do      -- debug view
-    local GOTO_CPU = 12
-    local GOTO_MEM = 13
-    local GOTO_PAGE = 14
+function ui.save_target_data(target)
+    target = target or udbg.target
+    if not target then return end
 
-    function ui.goto_cpu(a)
-        ui_notify(GOTO_CPU, eval_address(a))
+    local module_bp = {}
+    for _, bp in ipairs(target:breakpoint_list()) do
+        local m = target:get_module(bp.address)
+        if not udbg.BPCallback[bp.id] and m then
+            local info = {
+                module = m.name,
+                type = bp.type,
+                rva = bp.address - m.base,
+                symbol = target:get_symbol(bp.address),
+            }
+            local list = module_bp[info.module]
+            if not list then
+                list = table {}
+                module_bp[info.module] = list
+            end
+            info.enable = bp.enabled
+            -- log(hex_line(item))
+            list:insert(info)
+        end
     end
 
-    function ui.goto_mem(a)
-        ui_notify(GOTO_MEM, eval_address(a))
+    if __config.backup_breakpoint then
+        local path = __data_dir..'/bplist.json'
+        ui.info('[bplist]', 'save', path)
+        ui.writefile(path, json.encode(module_bp))
     end
 
-    function ui.goto_page(a)
-        ui_notify(GOTO_PAGE, eval_address(a))
+    local path = __data_dir..'/config.json'
+    ui.info('[config]', 'save', path)
+    ui.writefile(path, json.encode(udbg.config))
+end
+
+ucmd.register('cpu', function(args)
+    ui.goto_cpu(args[1])
+end)
+
+ucmd.register('mem', function(args)
+    ui.goto_mem(args[1])
+end)
+
+ucmd.register('page', function(args)
+    ui.goto_page(args[1])
+end)
+
+function event.on.targetSuccess()
+    local target = udbg.target
+    local image_base = target.image_base or 0
+
+    if image_base == 0 then
+        local m = target:enum_module()()
+        image_base = m and m.base or 0
+        target.image = m
+    else
+        target.image = target:get_module(image_base)
+    end
+    ui.goto_mem(image_base)
+    if target.image then
+        ui.goto_cpu(target.image.entry_point)
+    end
+
+    local name = os.path.basename(target.path)
+    ui.main:set('windowTitle', name .. ' - ' .. target.pid)
+    ui.g_status:set('text', target:status():gsub('^.', string.upper))
+    ui.load_target_data()
+end
+
+function event.on.targetProcessCreate()
+    local target = udbg.target
+    if not target.image then
+        target.image = target:get_module(target.image_base)
+        if target.image then
+            ui.goto_cpu(target.image.entry_point)
+        end
     end
 end
-log, logc, clog = ui.log, ui.logc, ui.clog
+
+function event.on.targetEnded(target)
+    ui.save_target_data(target)
+    ui.request('onTargetEnded')
+end
 
 return ui

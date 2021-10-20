@@ -6,6 +6,7 @@ asm                          --     assembly a instruction
     <insn>    (string)              the instruction
     <address> (optional address)    the address
 
+    --arch    (optional string)
     --hex                       from hex string
     -w, --write                 assembly and write to address
 ]]
@@ -52,7 +53,7 @@ function mod.main(args)
         return
     end
 
-    local data = args.hex and args.insn:fromhex() or mod.assemble(args.address, args.insn)
+    local data = args.hex and args.insn:fromhex() or mod.assemble(args.address, args.insn, args.arch)
     log(hex(args.address) .. ':', data:to_hex())
 
     if args.write then

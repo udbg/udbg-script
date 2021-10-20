@@ -74,18 +74,18 @@ function mod.main(args, out)
         function display(r, depth)
             for _, i in ipairs(r) do
                 local color, info, t = i.color, i.info, i.type
-                logc('green', string.rep('  ', depth-1))
-                logc('gray', '+0x%04x ' % i.offset)
-                logc('gray', fmt_addr(i.address) .. ' ')
-                logc('yellow', fmt_size(i.ptr) .. ' ')
+                ui.logc('green', string.rep('  ', depth-1))
+                ui.logc('gray', '+0x%04x ' % i.offset)
+                ui.logc('gray', fmt_addr(i.address) .. ' ')
+                ui.logc('yellow', fmt_size(i.ptr) .. ' ')
                 if info then
                     if t == 'return' then
                         info = info[1].string
-                        logc('green', get_symbol(i.ptr))
+                        ui.logc('green', get_symbol(i.ptr))
                         local m = get_module(i.ptr)
-                        logc('gray', m and m:find_function(i.ptr) and ' *' or ' ')
+                        ui.logc('gray', m and m:find_function(i.ptr) and ' *' or ' ')
                     end
-                    logc(color, info)
+                    ui.logc(color, info)
                 end
                 log ''
                 if #i > 0 then

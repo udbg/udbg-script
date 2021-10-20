@@ -16,8 +16,20 @@ function pointer_color_info(p, ret)
     return color, info, t
 end
 
+function enum_psinfo()
+    return udbg.engine.default:enum_process()
+end
+
+function errno_assert(b, err, ...)
+    if not b and err then
+        local text, code = get_last_error()
+        err = err .. ': ' .. code .. '(' .. text .. ')'
+    end
+    return assert(b, err, ...)
+end
+
 local pending_module = {} _ENV.pending_module = pending_module
-uevent.on('module-load', function(module)
+uevent.on('targetModuleLoad', function(module)
     local i = 1
     while i <= #pending_module do
         local pm = pending_module[i]
@@ -93,60 +105,75 @@ do          -- evaluate address
     local parse_cell, parse_bin, parse_expr
     local type = type
 
-    function parse_cell(expr, pos)
+    function parse_cell(target, expr, pos)
         -- skip white chars
         pos = expr:find('%S', pos)
         if not pos then return end
 
         -- pointer(...)
         if expr:sub(pos, pos) == '[' then
-            local subexp, endp = parse_expr(expr, pos + 1)
+            local subexp, endp = parse_expr(target, expr, pos + 1)
             assert(subexp, 'expect a expr')
             assert(expr:sub(endp, endp) == ']', "expect ']' @"..endp)
             return 'read_ptr(' .. subexp .. ')', endp + 1
         end
+        local cell = expr:match([[%b'']], pos) or expr:match([[%b""]], pos)
+        if cell then
+            if cell:sub(#cell) ~= cell:sub(1, 1) then
+                error('string not closed: ' .. cell)
+            end
+        end
         -- symbol expression
-        local cell = expr:match('[^%+%-%*%s%[%]]+', pos)
+        cell = cell or expr:match('[^%+%-%*%s%[%]]+', pos)
         if not cell then
             error('invalid cell: @' .. pos)
         end
 
+        local t = cell:find'^[\'"]' and cell:sub(2, -2) or cell
         local result
-        if cell:match('^0[xX]%x+$') then
-            result = cell
-        elseif cell:match('^%x+$') then
-            result = '0x' .. cell
+        if t:match('^0[xX]%x+$') then
+            result = t
+        elseif t:match('^%x+$') then
+            result = '0x' .. t
         else
-            local a = parse_address(cell)
+            local a = target:parse_address(t)
             if not a then
-                error('invalid symbol: ' .. cell)
+                local m, sym = t:splitv '!'; m = m or t
+                m = m == '$exe' and target.image or target:get_module(m)
+                assert(m, 'invalid symbol: ' .. t)
+                if sym then
+                    sym = sym == '$entry' and m.entry or m:get_symbol(sym)
+                else
+                    sym = 0
+                end
+                a = m.base + sym
             end
             result = hex(a)
         end
         return result, pos + #cell
     end
 
-    function parse_bin(expr, pos)
+    function parse_bin(target, expr, pos)
         -- skip white chars
         pos = expr:find('%S', pos)
         if not pos then return end
 
         local op = expr:sub(pos, pos)
         if op == '+' or op == '-' or op == '*' then
-            local cell, endp = parse_cell(expr, pos + 1)
+            local cell, endp = parse_cell(target, expr, pos + 1)
             return op .. cell, endp
         end
     end
 
-    function parse_expr(expr, pos)
+    function parse_expr(target, expr, pos)
         -- skip white chars
         pos = expr:find('%S', pos)
         if not pos then return end
 
         local result
-        result, pos = parse_cell(expr, pos)
+        result, pos = parse_cell(target, expr, pos)
         while expr:sub(pos, pos) do
-            local op_expr, endp = parse_bin(expr, pos)
+            local op_expr, endp = parse_bin(target, expr, pos)
             if not op_expr then break end
             result = result..op_expr
             pos = endp
@@ -159,12 +186,12 @@ do          -- evaluate address
     ---@param calc boolean|nil
     ---@return function|integer @lua function or its result
     ---@return string @converted lua script
-    function eval_address(expr, calc)
+    function UDbgTarget:eval_address(expr, calc)
         if type(expr) ~= 'string' then
             return expr
         end
         calc = calc == nil or calc
-        local lexpr = parse_expr(expr, 1)
+        local lexpr = parse_expr(self, expr, 1)
         if not lexpr then
             error('invalid address expression: ' .. expr)
         end
@@ -190,8 +217,8 @@ do -------- Extend global --------
     local addr_fmt, size_fmt
     function fmt_addr(a) return format(addr_fmt, a) end
     function fmt_size(a) return format(size_fmt, a) end
-    function fmt_addr_sym(a)
-        local sym = get_symbol(a)
+    function UDbgTarget:fmt_addr_sym(a)
+        local sym = self:get_symbol(a)
         a = fmt_addr(a)
         return sym and a..'('..sym..')' or a
     end
@@ -203,7 +230,7 @@ do -------- Extend global --------
     end
     set_psize(__llua_psize)
 
-    local cs = capstone(os.arch)
+    local cs = Capstone.new(os.arch)
     local dis = cs.disasm
     function disasm(address)
         local insns = dis(cs, address)
@@ -225,11 +252,11 @@ do -------- Extend global --------
 
     function uevent.on.context_change(psize, arch)
         ui.info('context_change', psize, arch)
-        cs = capstone(arch)
+        cs = Capstone.new(arch)
         set_psize(psize)
         if udbg.target then
             udbg.target.psize = psize
-            udbg.set('capstone', cs)
+            udbg.set('Capstone.new', cs)
         end
     end
 end

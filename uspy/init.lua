@@ -3,12 +3,9 @@ require 'udbg.lua'
 
 local uspy = {}
 
-local udbg = g_udbg
-local notify, request = udbg.notify, udbg.request
-function ui_notify(method, args) return notify(udbg, method, args) end
-function ui_request(method, args) return request(udbg, method, args) end
-
+ui_session = g_udbg
 require 'udbg.ui'
+libffi = require 'libffi'
 uspy.service = require 'uspy.service'
 
 local dbg_, concat = dbg_, string.concat

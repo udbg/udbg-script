@@ -1,5 +1,5 @@
 
-local api = require 'win.api'
+local api = libffi.C
 local libffi = require 'libffi'
 local mod = {}
 

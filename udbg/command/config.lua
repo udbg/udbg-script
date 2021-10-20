@@ -1,4 +1,3 @@
--- local ui = require "script.udbg.plugin.ui"
 
 return function()
     local udbg_event = {

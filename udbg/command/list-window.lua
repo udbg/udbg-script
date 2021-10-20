@@ -54,7 +54,7 @@ function mod.main(args, out)
         if cls:find(args.class or '') then
             local pid, tid = win.get_pid_tid(w)
             if args.pid and pid == args.pid or args.all then
-                out(hex(w), pid..':'..tid, cls, {text = win.get_text(w), color = win.is_visible(w) and ui.color.gray})
+                out(hex(w), pid..':'..tid, cls, {text = win.get_text(w), fg = win.is_visible(w) and 'black' or 'gray'})
             end
         end
     end

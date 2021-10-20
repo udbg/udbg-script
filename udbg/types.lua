@@ -137,7 +137,10 @@ do  -- CVal
         end
 
         local field = assert(self[FIELDLIST], struct_error)[key]
-        if not field then return end
+        if not field then
+            local method = ty.method
+            return method and method[key]
+        end
 
         address = address + field.offset
         ty = field.type
@@ -217,6 +220,7 @@ function lib.struct(field_list)
     local this = setmetatable({
         alignment = field_list.alignment,
         size = 0, max_field_size = 0,
+        method = field_list.method,
         field_list = {}, struct = true,
     }, Type)
     for _, field in ipairs(field_list) do
@@ -255,6 +259,10 @@ function lib.add_field(self, field)
     -- update struct size
     local last = field_list[#field_list]
     self.size = align(last.offset + last.type.size, alignment)
+end
+
+function lib.set_pointer_size(psize)
+    pointer_size = psize
 end
 
 return lib

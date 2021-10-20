@@ -1,10 +1,10 @@
 
-local mod = {}
+local mod = {is_task = true}
 
 mod.parser = [[
 sym                          -- show module symbols
     <name> (string)             module name
-    <filter> (optional string)  symbol filter
+    <filter> (default '*')      symbol filter
 
     -u, --uname                 show undecorated name
     --len                       show length of the symbol
@@ -12,7 +12,7 @@ sym                          -- show module symbols
 
 local showlen = false
 local showuname = false
-local abort = false
+
 local function show(m, filter, task, out)
     local iter = m:enum_symbol(filter)
     local base = m.base
@@ -32,25 +32,22 @@ local function show(m, filter, task, out)
     end
 end
 
-function mod.main(args, out)
+function mod.main(args, out, task)
     showlen = args.len
     showuname = args.uname
-    require 'udbg.task'.spawn(function(task)
-        if args.showlen then
-            out.color = {'gray', 'gray', ''}
-        else
-            out.color = {'gray', ''}
-        end
-        if args.name == '*' then
-            for m in enum_module() do
-                show(m, args.filter, task, out)
-                if abort then break end
-            end
-        else
-            local m = assert(get_module(args.name), 'invalid module')
+
+    if args.showlen then
+        out.color = {'gray', 'gray', ''}
+    else
+        out.color = {'gray', ''}
+    end
+    for m in enum_module() do
+        if m.name:wildmatch(args.name) then
             show(m, args.filter, task, out)
         end
-    end)
+        if task.abort then break end
+    end
+    out.progress = 100
 end
 
 return mod

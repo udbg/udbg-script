@@ -40,6 +40,12 @@ local function class(body)
                 body[name] = parent[name]
             end
         end
+
+        local newIndex = __newindex
+        local parentNewIndex = parent.__newindex
+        if parentNewIndex and not newIndex then
+            __newindex = parentNewIndex
+        end
     end
 
     local parentIndex = parent and parent.__index
@@ -64,10 +70,13 @@ local function class(body)
         end
     end
 
-    local set = body.__set
+    local parentSet = parent and parent.__set
+    local set = body.__set or parentSet
     if type(set) == 'table' then
         function body:__newindex(key, val)
             local setter = set[key]
+            if setter then return setter(self, val) end
+            setter = parentSet and parentSet[key]
             if setter then return setter(self, val) end
             if __newindex then
                 return __newindex(self, key, val)

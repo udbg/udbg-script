@@ -1,19 +1,15 @@
 
-local ui = require 'udbg.ui'
 local lapp = require 'pl.lapp'
 
 function lapp.quit(msg, no_usage)
     -- if not no_usage then log(_ENV.usage) end
-    ui.error(msg) error('')
+    log.error(msg) error('')
 end
-
-lapp.add_type('address', function(s)
-    return assert(eval_address(s), 'invalid address expression')
-end)
 
 local cmd = {
     use_cache = true,
     no_outer = false,
+    outer = {},
     prefix = 'udbg.command.'
 }
 setmetatable(cmd, cmd)
@@ -103,7 +99,7 @@ function cmd.load(modpath, reload)
                 package.loaded[modpath] = res
                 return res
             end
-            ui.error(res)
+            log.error(res)
         end
     end
 end
@@ -128,6 +124,7 @@ local Filter = {} do
                 local fmt = format and format[i]
                 args[n] = fmt and fmt:format(v) or v
             end
+            -- TODO:
             return ui.clog(args)
         end
         if format then
@@ -136,13 +133,10 @@ local Filter = {} do
                 local fmt = format and format[i]
                 args[i] = fmt and fmt:format(v) or v
             end
-            return ui.log(table.unpack(args))
+            return log.log(table.unpack(args))
         end
-        ui.log(...)
+        log.log(...)
     end
-    -- function out:log(...) self(ui.log, ...) end
-    -- function out:info(...) self(ui.info, ...) end
-    -- function out:warn(...) self(ui.warn, ...) end
     Filter.__index = Filter
 end
 
@@ -218,6 +212,7 @@ function cmd.find(name, prefix)
 end
 
 local function table_outer(name, command)
+    local ui = require 'udbg.ui'
     local tbl = ui.table {name = 'table', columns = command.column}
     local outer = {icol = 0, line = 0, tbl = tbl}
     local progress = ui.progress {name = 'progress', value = 0}
@@ -278,28 +273,7 @@ local function table_outer(name, command)
             end
             self.icol = 0
         else
-            local color
-            for i, val in ipairs(args) do
-                if type(val) == 'table' then
-                    args[i] = val.text
-                    local c = val.color
-                    if c then
-                        if type(c) == 'string' then
-                            c = ui.color[c] or 0
-                        end
-                        if c > 0 then
-                            color = color or {}
-                            color[i] = c
-                        end
-                    end
-                end
-            end
             tbl:append(args)
-            if color then
-                for i, c in pairs(color) do
-                    tbl(ui.SET_COLOR, -1, i-1, c)
-                end
-            end
         end
         self.line = self.line + 1
     end
@@ -326,36 +300,37 @@ local function table_outer(name, command)
     return setmetatable(outer, outer)
 end
 
-local NormalOuter = {}
-setmetatable(NormalOuter, NormalOuter)
-
-local select, tostring = select, tostring
-function NormalOuter:__call(...)
-    local colors = self.color
-    local widths = self.width
-    local black = ui.color.black
-    local type = type
-    local insert = table.insert
-    local line = {}
-    for i = 1, select('#', ...) do
-        local item = select(i, ...)
-        local color = colors and colors[i] or black
-        local width = widths and widths[i] or 0
-        local text = item
-        if type(item) == 'table' then
-            text = item.text or ''
-            color = item.color or color or black
-            width = item.width or 0
+local NormalOuter = {} do
+    local select, tostring = select, tostring
+    local black
+    function NormalOuter:__call(...)
+        black = black or log.colormap.black
+        local colors = self.color
+        local widths = self.width
+        local type = type
+        local insert = table.insert
+        local line = {}
+        for i = 1, select('#', ...) do
+            local item = select(i, ...)
+            local fg = colors and colors[i] or black
+            local width = widths and widths[i] or 0
+            local text = item
+            if type(item) == 'table' then
+                text = item.text or ''
+                fg = item.fg or fg or black
+                width = item.width or 0
+            end
+            if type(fg) == 'string' then
+                fg = log.colormap[fg]
+            end
+            insert(line, width << 32 | fg)
+            insert(line, tostring(text))
         end
-        if type(color) == 'string' then
-            color = ui.color[color]
-        end
-        insert(line, width << 32 | color)
-        insert(line, tostring(text))
+        insert(line, 0)
+        insert(line, '\n')
+        log.color_line(line)
     end
-    insert(line, 0)
-    insert(line, '\n')
-    ui.log_color_line(line)
+    cmd.outer.normal = setmetatable(NormalOuter, NormalOuter)
 end
 
 ---dispatch command
@@ -402,7 +377,7 @@ function cmd.dispatch(cmdline, prefix)
             if outype == 'table' then
                 outer = table_outer(outname, command)
             else
-                outer = NormalOuter
+                outer = cmd.outer.normal
             end
         end
         -- outer.filter = filter

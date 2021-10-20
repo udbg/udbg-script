@@ -1,6 +1,6 @@
 
 return function(args, out)
-    local windows = __llua_os == 'windows'
+    local windows = os.name == 'windows'
     if windows then
         out.title = {'tid', 'entry', 'teb', 'status', 'priority', 'suspend count', 'last error'}
         out.width = {6, 24, 18, 12, 12, 4, 10}

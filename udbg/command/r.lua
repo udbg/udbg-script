@@ -13,14 +13,14 @@ local regs = {
 }
 
 local function show(k)
-    logc('gray', ('%5s '):format(k))
+    ui.logc('gray', ('%5s '):format(k))
     local val = reg[k] or 0
-    logc('yellow', fmt_size(val) .. ' ')
+    ui.logc('yellow', fmt_size(val) .. ' ')
     if k == 'rip' or k == 'eip' or k == 'pc' then
-        logc('blue', get_symbol(val))
+        ui.logc('blue', get_symbol(val))
     else
         local c, i = pointer_color_info(val)
-        logc(c, i)
+        ui.logc(c, i)
     end
     log ''
 end
@@ -33,7 +33,7 @@ function mod.main(args)
         end
         show(k)
     else
-        local regs = regs[__llua_arch]
+        local regs = regs[os.arch]
         for _, k in ipairs(regs) do show(k) end
     end
 end

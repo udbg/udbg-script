@@ -99,7 +99,7 @@ ListenKey.__index = ListenKey do
     end
 
     function ListenKey:cancel()
-        ui_notify(CANCEL_LISTEN_KEY, self.id)
+        ui.notify(CANCEL_LISTEN_KEY, self.id)
         maps[self.id] = nil
         registed[self.keysid] = nil
     end
@@ -144,33 +144,33 @@ do      -- data
             found = true
         end
         if found then
-            ui_notify(DATA_PUSH, args)
+            ui.notify(DATA_PUSH, args)
         end
     end
 
     function Data:__newindex(key, val)
         if key == 'width' then
-            ui_notify(DATA_WIDTH, {self[1], val})
+            ui.notify(DATA_WIDTH, {self[1], val})
         elseif key == 'filter' then
-            ui_notify(DATA_FILTER, {self[1], val})
+            ui.notify(DATA_FILTER, {self[1], val})
         elseif key == 'state' then
-            ui_notify(DATA_STATE, {self[1], val})
+            ui.notify(DATA_STATE, {self[1], val})
         elseif key == 'color' then
             for i, v in ipairs(val) do
                 val[i] = color[v] or 0
             end
-            ui_notify(DATA_COLOR, {self[1], val})
+            ui.notify(DATA_COLOR, {self[1], val})
         else
             rawset(self, key, val)
         end
     end
 
     function Data:__close()
-        ui_notify(DATA_FLUSH, self[1])
+        ui.notify(DATA_FLUSH, self[1])
     end
 
     function Data:__gc()
-        ui_notify(DATA_CLOSE, self[1])
+        ui.notify(DATA_CLOSE, self[1])
     end
 end
 

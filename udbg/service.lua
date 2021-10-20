@@ -7,14 +7,6 @@ local unpack, type = table.unpack, type
 
 service.on_ctrl_event = ui.on_ctrl_event
 
-function service.fire_event(args)
-    if type(args) == 'table' then
-        event.fire(table.unpack(args))
-    else
-        event.fire(args)
-    end
-end
-
 function service.lua_execute(data, path, mod_path)
     local ok, r = event.async_call(assert(load(data, '@'..path, 'bt')))
     if ok then
@@ -78,89 +70,12 @@ function service.engine_command(cmdline)
         ui.warn('*BUSY*')
         return
     end
-    thread.spawn(function()
+    require'udbg.task'.spawn(function()
         busy = true
         log('[eng] >>', cmdline)
         udbg.do_cmd(cmdline)
         busy = false
-    end)
-end
-
-function service.call(script)
-    if type(script) == 'table' then
-        return assert(load(script[1]))(unpack(script, 2))
-    else
-        return assert(load(script))()
-    end
-end
-
-local function parse_expr(global)
-    local t = _ENV
-    for k in global:gsplit('.', 1, true) do
-        if not t then break end
-        t = t[k]
-    end
-    return t
-end
-
-function service.call_global(args)
-    if type(args) == 'table' then
-        local fun = parse_expr(args[1])
-        return fun(unpack(args, 2))
-    else
-        local fun = parse_expr(args)
-        return fun()
-    end
-end
-
-function service.memory_operand(address)
-    local insn = disasm(address)
-    if insn then
-        for i = 0, 5 do
-            local ot, val = insn(0, 'operand', i)
-            if ot == 'mem' then return val end
-        end
-    end
-end
-
-function service.modify_memory(a, ts, value)
-    local address = parse_address(a)
-    if not address then
-        return ui.error('Invalid Address', a)
-    end
-    local ok, err = pcall(function()
-        local ty = types.def(ts)
-        ty[address] = value
-    end)
-    if not ok then ui.error(err) end
-end
-
-function service.set_global(name, val)
-    -- log('[set_global]', args)
-    _ENV[name] = val
-end
-
-function service.get_global(var)
-    -- log('[get_global]', var, _ENV[var])
-    local val = _ENV[var]
-    if val == nil then
-        val = parse_expr(var)
-    end
-    return val
-end
-
-function service.update_global(var, t)
-    local val = parse_expr(var)
-    if type(val) ~= 'table' then
-        ui.error(var, 'is', 'not', 'a', 'table')
-        return
-    end
-    if type(t) == 'string' then
-        t = eval('{' .. t .. '}')
-    end
-    if type(t) == 'table' then
-        for k, v in pairs(t) do val[k] = v end
-    end
+    end, {name = 'engine-command'})
 end
 
 do  -- Struct Monitor View

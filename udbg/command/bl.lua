@@ -1,9 +1,9 @@
 
 return function()
-    for _, id in ipairs(get_bp_list()) do
-        local address, t, c = get_bp(id, 'address', 'type', 'hitcount')
-        logc('gray', fmt_addr(address) .. ' ' .. c .. ' ')
-        logc('yellow', t .. ' ')
+    for _, bp in ipairs(breakpoint_list()) do
+        local address, t, c = bp.address, bp.type, bp.hitcount
+        ui.logc('gray', fmt_addr(address) .. ' ' .. c .. ' ')
+        ui.logc('yellow', t .. ' ')
         log(get_symbol(address))
     end
 end

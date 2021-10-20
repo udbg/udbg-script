@@ -31,17 +31,17 @@ function mod.main(args)
         local data = read_bytes(addr, 16)
         if not data then break end
 
-        logc('gray', hex(addr) .. ' ')
+        ui.logc('gray', hex(addr) .. ' ')
         local t = {pack:unpack(data)}
         t[#t] = nil
         for j = 1, #t do t[j] = fmt:format(t[j]) end
         table.insert(t, '')
-        logc('green', table.concat(t, ' '))
+        ui.logc('green', table.concat(t, ' '))
         local text = data:gsub('.', function(c)
             local byte = c:byte()
             return (byte < 32 or byte > 0x7f) and '.' or c
         end)
-        logc('yellow', text .. '\n')
+        ui.logc('yellow', text .. '\n')
     end
 end
 

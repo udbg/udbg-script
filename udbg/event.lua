@@ -1,18 +1,15 @@
 
-local mod = {error = print}
+local mod = {error = print, count = {}}
 
 -- et[event_name] => handlers
 -- et[event_func] => handlers
 --      handlers => {event_func, ...}
 ---@type table<string|function,function[]>
 local et = {}               -- event handler table
-local mt = {__mode = 'kv'}
----@type table<function|thread, boolean>
-local async_map = {}
-setmetatable(async_map, mt)
----@type table<thread, table>
-local state_map = {}
-setmetatable(state_map, mt)
+
+---@type table<function, integer>
+local optTable = {__mode = 'k'}
+setmetatable(optTable, optTable)
 
 local xpcall, ipairs, type = xpcall, ipairs, type
 local traceback = debug.traceback
@@ -32,6 +29,7 @@ local function async_call(fn, ...)
     return ok, r1, r2, r3, r4, r5
 end
 
+local count = mod.count
 ---fire a event
 ---@param event string
 ---@vararg any @arguments
@@ -40,14 +38,12 @@ function mod.fire(event, ...)
     if not handlers then return end
     local ok, r1, r2, r3, r4, r5
 
+    count[event] = (count[event] or 0) + 1
     for i, handler in ipairs {unpack(handlers)} do
         if type(handler) == "thread" then
             mod.cancel(handler)
             ok, r1, r2, r3, r4, r5 = resume(handler, ...)
             if not ok then r1 = traceback(handler, r1) end
-        elseif async_map[handler] then
-            mod.cancel(handler)
-            ok, r1, r2, r3, r4, r5 = async_call(handler, ...)
         else
             ok, r1, r2, r3, r4, r5 = xpcall(handler, traceback, ...)
         end
@@ -76,11 +72,18 @@ function mod.get(event, all)
 end
 
 local isyieldable = coroutine.isyieldable
+local binary_search = table.binary_search
+
 ---register a event callback
 ---@param event string
 ---@param callback function
+---@param opt? {order: integer, async: boolean}
 ---@return function @as a id, to cancel
-local function on_event(self, event, callback)
+local function on_event(self, event, callback, opt)
+    if opt and opt.async then
+        callback = coroutine.create(callback)
+    end
+
     local ty = type(callback)
     if ty == "nil" then
         callback = running()
@@ -99,7 +102,15 @@ local function on_event(self, event, callback)
     local is_new = not handlers
     if is_new then handlers = {} end
 
-    table.insert(handlers, callback)
+    local pos, max = binary_search(handlers, opt and opt.order or 1, function(cur, o)
+        local opt = optTable[cur]
+        local curOrder = opt and opt.order or 1
+        if curOrder == o then return 0 end
+        return curOrder < o and -1 or 1
+    end)
+    optTable[callback] = opt
+
+    table.insert(handlers, pos and pos + 1 or max or 1, callback)
     if is_new then et[event] = handlers end
 
     et[callback] = handlers
@@ -119,10 +130,6 @@ function mod.on:__index(event)
 end
 
 function mod.on:__newindex(event, callback)
-    if event:find '^async_' then
-        event = event:gsub('^async_', '')
-        async_map[callback] = true
-    end
     event = event:gsub('_', '-')
     return on_event(self, event, callback)
 end

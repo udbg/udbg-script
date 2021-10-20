@@ -2,59 +2,104 @@
 local client, args = ...
 local path = os.path
 _ENV.g_client = client
+client.arguments = args
 
+local CONFIG_NAME<const> = 'udbg-config.lua'
 local root_dir = client:get 'root'
 local script_dir = path.join(root_dir, 'script')
-local config_dir = args.use_confdir or path.join(root_dir, 'config')
-if not path.exists(config_dir) then
-    -- find config directory upward
-    local dir = path.dirname(os.getexe())
-    while dir do
-        local cfgdir = path.join(dir, '.udbg')
-        if path.isdir(cfgdir) then
-            config_dir = cfgdir
-            break
-        end
-        dir = path.dirname(dir)
-    end
-end
-client.config_dir = config_dir
-
 local origin_paths = package.path
 local lua_paths = {
     path.join(script_dir, '?.lua'),
-    path.join(config_dir, '?.lua'),
-    path.join(config_dir, '?.luac'),
+    path.join(script_dir, '?.luac'),
 }
 package.path = table.concat(lua_paths, ';') .. ';' .. origin_paths
 
-local service = require 'udbg.base.service'
-_ENV.service = service; client.service = service
+local config_path = args.use_confdir or path.join(root_dir, CONFIG_NAME)
+client.config_path = path.exists(config_path) and config_path or (function()
+    -- find config directory upward
+    local dir = path.dirname(os.getexe())
+    while dir do
+        local cfgpath = path.join(dir, CONFIG_NAME)
+        if path.exists(cfgpath) then
+            config_path = cfgpath
+            return cfgpath
+        end
+        dir = path.dirname(dir)
+    end
+    writefile(config_path, require 'udbg.client.defaultconfig')
+    return config_path
+end)()
 
 require 'udbg.lua'
-local ui = require 'udbg.ui'
+local log = {} do
+    _G.log = log
+    setmetatable(log, log)
+
+    local INFO<const> = 3
+    local LOG<const> = 4
+    local WARN<const> = 5
+    local ERROR<const> = 6
+    local concat = string.concat
+
+    local logout = assert(client.log)
+    local logcolor = assert(client.logcolor)
+
+    function log.log(...)
+        return logout(client, LOG, concat(...))
+    end
+
+    function log.warn(...)
+        return logout(client, WARN, concat(...))
+    end
+
+    function log.info(...)
+        return logout(client, INFO, concat(...))
+    end
+
+    function log.error(...)
+        return logout(client, ERROR, concat(...))
+    end
+
+    local color = {
+        [''] = 0, green = 1, blue = 2, gray = 3,
+        yellow = 4, white = 5, black = 6, red = 7,
+    }
+    log.colormap = color
+    function log.color(c, t, width)
+        return logcolor(client, {color[c] or c, tostring(t), width})
+    end
+
+    function log.color_line(line)
+        return logcolor(client, line)
+    end
+
+    function log:__call(...)
+        return logout(client, LOG, concat(...))
+    end
+
+    __llua_error = log.error
+end
 local event = require 'udbg.event'
-event.error = ui.error
-_ENV.ui, _ENV.uevent = ui, event
+_ENV.uevent = event
 local readfile = readfile
-local verbose = args.verbose and ui.log or function() end
+local verbose = args.verbose and log or function() end
 
 verbose('[root_dir]', root_dir)
 verbose('[args]', pretty ^ args)
 
 local config = {
     precompile = true,
-    precompile_strip = true,
+    precompile_strip = false,
     data_dir = false,
     plugins = {},
     remote_map = {},
-    show_window = not args.no_window,
+    udbg_config = {},
 }
-_ENV.g_config = config
-setmetatable(config, {__index = _ENV})
-local plugin_dirs = table {script_dir, config_dir}
+client.config = setmetatable(config, {__index = _ENV})
+
+local plugin_dirs = table {script_dir}
+client.plugin_dirs = plugin_dirs
 do  -- load config/client.lua, init the plugin_dirs and package.path
-    local config_path = path.join(config_dir, 'client.lua')
     local data = readfile(config_path)
     if data then
         verbose('[config path]', config_path)
@@ -81,28 +126,26 @@ do  -- load config/client.lua, init the plugin_dirs and package.path
             end
         end
         if editor then
-            ui.info('detected editor:', editor)
+            log.info('detected editor:', editor)
             config.edit_cmd = editor .. ' %1'
         else
             config.edit_cmd = 'start notepad %1'
         end
     end
 
-    -- extend client
-    function client:exit_ui(code)
-        self:save_history(path.join(config.data_dir, '.cmd-history'))
-        self:exit(code)
-    end
-
     for _, plug in ipairs(config.plugins) do
+        if type(plug) == 'string' then
+            plug = {path = plug}
+        end
         if plug.path then
             local dir = plug.path
-            -- print('[plugin]', dir)
-            assert(path.isdir(dir), 'plugin dir is not exists')
-    
-            plugin_dirs:insert(dir)
-            table.insert(lua_paths, path.join(dir, '?.lua'))
-            table.insert(lua_paths, path.join(dir, '?.luac'))
+            if path.isdir(dir) then
+                plugin_dirs:insert(dir)
+                table.insert(lua_paths, path.join(dir, '?.lua'))
+                table.insert(lua_paths, path.join(dir, '?.luac'))
+            else
+                log.error(pretty % dir, 'is not directory')
+            end
         end
     end
     package.path = table.concat(lua_paths, ';') .. ';' .. origin_paths
@@ -128,28 +171,30 @@ local function execute_lua(lua_path, data, mod_path)
         -- TODO: bugfix notify
         g_session:request('lua_execute', {data, lua_path, mod_path})
     else
-        ui.warn('read', lua_path, 'failed')
+        log.warn('read', lua_path, 'failed')
     end
 end
 
-local watch_cache = table {}
+function client:edit_script(lua_path)
+    os.execute(config.edit_cmd:gsub('%%1', lua_path))
+end
 
-local function execute_bin(lua_path, opt)
+local watch_cache = table {}
+client.watch_cache = watch_cache
+
+function client:execute_bin(lua_path, opt)
     local mod_path
     if not path.isfile(lua_path) then
         mod_path = 'udbg.bin.' .. lua_path
         lua_path = searchpath(mod_path)
         if not lua_path then
-            ui.warn(lua_path, 'not found')
+            log.warn(lua_path, 'not found')
         end
     end
 
-    local function edit_script()
-        os.execute(config.edit_cmd:gsub('%%1', lua_path))
-    end
     if lua_path and path.isfile(lua_path) then
         if opt.edit then
-            edit_script()
+            client:edit_script(lua_path)
             return lua_path
         end
         if opt.watch then
@@ -170,62 +215,169 @@ local function execute_bin(lua_path, opt)
     elseif opt.edit then
         -- try create this file
         if not path.isabs(lua_path) then
-            local dir = path.isdir(config_dir) and config_dir or script_dir
+            local dir = path.isdir(config_path) and config_path or script_dir
             lua_path = path.withext(path.join(dir, 'bin', lua_path), 'lua')
         end
         if not path.exists(lua_path) then
             writefile(lua_path, '')
         end
-        edit_script()
+        client:edit_script(lua_path)
     end
 end
 
-local ucmd = require 'udbg.cmd'
-do
-    ucmd.prefix = 'udbg.client.cmd.'
-    ucmd.no_outer = true
+local service = require 'udbg.base.service'
+package.loaded['udbg.base.service'] = nil
+client:set('service', service)
+-- rpc service function
+client.service = service do
+    function service.ui_info(device)
+        -- log('device', device)
+        g_client:set('udbg_inited', true)
+        local data_dir = path.join(config.data_dir, assert(device.id))
+        os.mkdirs(data_dir)
+        g_client.data_dir = data_dir
+        log('[data_dir]', data_dir)
 
-    function ucmd.load(modpath)
+        local lsqlite3 = require 'lsqlite3'
+        g_client.db = lsqlite3.open(path.join(data_dir, 'data.db'))
+        g_client.db:exec [[
+CREATE TABLE IF NOT EXISTS command_history (
+    cmdline STRING   UNIQUE ON CONFLICT REPLACE,
+    time    DATETIME DEFAULT ( (datetime('now', 'localtime') ) )
+);
+
+CREATE TABLE IF NOT EXISTS target_history (
+    path STRING   UNIQUE ON CONFLICT REPLACE,
+    time DATETIME DEFAULT ( (datetime('now', 'localtime') ) ),
+    UNIQUE (
+        path COLLATE NOCASE
+    )
+);
+        ]]
+        return data_dir
     end
 
-local parser = [[
-.exec                           execute a script
-    <path> (optional string)    the script path
+    local ui, qt
+    -- extend client
+    function client:finallyExit(code)
+        ui.onClosed()
+        self:exit(code)
+    end
 
-    -w, --watch                 watch the script
-    -e, --edit                  edit this script
-    --list-watch
-]]
-    ucmd.register('.exec', function(argv)
-        if argv.path then
-            execute_bin(argv.path, argv)
-        elseif argv.list_watch then
-            local k = next(watch_cache, #watch_cache)
-            while k do
-                local i = watch_cache[k]
-                log(i, watch_cache[i], k)
-                k = next(watch_cache, k)
+    function service.onUiInited()
+        qt = require 'udbg.client.qt'
+        ui = require 'udbg.client.ui'
+        client.qt, client.ui = qt, ui
+
+        if not args.no_window then
+            ui.main:show()
+        end
+        ui.init()
+
+        event.fire('clientUiInited')
+        g_session:notify('call', 'uevent.fire("uiInited")')
+    end
+
+    function service.onCuiClose()
+        client:finallyExit(0)
+    end
+
+    function service.onSessionClose()
+        ui.onTargetEnd()
+        _ENV.g_session = nil
+        log.error('session disconnected')
+        ui.status:setStyleSheet 'color:red;'
+        ui.status:setText 'Disconnect'
+    end
+
+    local ucmd = require 'udbg.cmd'; _G.ucmd = ucmd
+    local stat
+    function service.clientCommand(cmdline, ty)
+        cmdline = cmdline:trim()
+        if #cmdline == 0 then return end
+        if not ty then
+            if cmdline:starts_with("=") then
+                ty = 'lua'
+                cmdline = cmdline:sub(2)
+            elseif cmdline:starts_with("*") then
+                ty = 'eng'
+                cmdline = cmdline:sub(2)
+            else
+                ty = 'udbg'
             end
         end
-    end, parser)
+        if ty == 'lua' then
+            log("[lua] >>", cmdline)
+            g_session:notify("lua_eval", cmdline)
+        elseif ty == 'eng' then
+            g_session:notify("engine_command", cmdline)
+        else
+            log('[cmd] >>', cmdline)
+            if cmdline:sub(1, 1) == '.' then
+                ucmd.dispatch(cmdline)
+            else
+                g_session:notify('execute_cmd', cmdline)
+            end
+        end
 
-    ucmd.register('.show', function(argv)
-        os.execute('explorer.exe /select,"' .. argv[1] .. '"')
-    end)
+        stat = stat or assert(g_client.db:prepare "REPLACE INTO command_history (cmdline) VALUES(?)", g_client.db:error_message())
+        stat:bind_values(cmdline); stat:step(); stat:reset()
 
-    ucmd.register('.edit', function(argv)
-        local path = assert(argv[1], 'no path')
-        os.execute(config.edit_cmd:gsub('%%1', path))
-    end)
-end
-
-do  -- rpc service function
-    local on_ctrl_event = ui.on_ctrl_event
-    service.on_ctrl_event = function(args)
-        return on_ctrl_event(table.unpack(args))
+        g_client:add_history(cmdline)
+        qt.gui(function()
+            qt.metaCall(ui.command, 'addHistory', qt.QString(cmdline))
+        end)
     end
 
-    function service.require(name)
+    -- monitor autorun
+    function service.onFileWrite(p)
+        verbose('[file-write]', p)
+        local _, ext = path.splitext(p)
+        if ext:startswith 'lua' then
+            local data = assert(readfile(p))
+            local lineiter = data:gsplit '\n'
+            local target = nil
+            for i = 1, 10 do
+                local line = lineiter()
+                if not line then break end
+                target = line:match '%s*%-%-+%s*udbg@(.-)%s+%-%-+'
+                if target then break end
+            end
+
+            if target then
+                client:info('[autorun]', 'target:', target)
+            end
+
+            if target == '.client' then
+                assert(event.async_call(assert(load(data, p))))
+            else
+                execute_lua(p, data)
+            end
+        end
+    end
+
+    local arch = {x86 = 0, x86_64 = 1, arm = 2, arm64 = 3}
+    function service.onTargetSuccess(info)
+        client.target_alive = true
+        client:set('target_alive', true)
+        log('[target]', info)
+        qt.gui(function()
+            ui.onTargetStart()
+            ui.add_recently(info.path)
+            qt.metaSet(ui.disasm, 'arch', arch[info.arch] or error 'invalid arch name')
+        end)
+    end
+
+    function service.onTargetEnded()
+        client.target_alive = false
+        qt.gui(function()
+            ui.onTargetEnd()
+            client:set('target_alive', false)
+            ui.status:setText 'Ended'
+        end)
+    end
+
+    local function require_lua(name, precompile)
         -- print('[require]', name)
         local lua_path
         if name:find('/', 1, true) then
@@ -237,8 +389,8 @@ do  -- rpc service function
             verbose('[require]', lua_path)
             local res = readfile(lua_path)
             local size = #res
-            if config.precompile and size > 2048 then
-                res = assert(load(res, lua_path))
+            if precompile and size > 2048 then
+                res = assert(load(res, '@' .. lua_path))
                 res = string.dump(res, config.precompile_strip)
                 verbose('save the size:', (size - #res) / 1024)
             end
@@ -247,21 +399,12 @@ do  -- rpc service function
             verbose('[require failed]', name)
         end
     end
-
-    function service.ui_info()
-        return {'qt', root_dir, config.data_dir}
+    function service.require(name)
+        return require_lua(name, config.precompile)
     end
 
-    function service.config(conf)
-        table.update(config, conf)
-    end
-
-    function service.fire_event(args)
-        if type(args) == 'table' then
-            event.fire(table.unpack(args))
-        else
-            event.fire(args)
-        end
+    function service.require_raw(name)
+        return require_lua(name)
     end
 
     function service.filemeta(p)
@@ -278,36 +421,13 @@ do  -- rpc service function
     end
 
     function service.exit(code)
-        client:exit_ui(code)
-    end
-
-    function service.execute_cmd(cmdline)
-        cmdline = cmdline:trim()
-        client:add_history(cmdline)
-        log("[cmd] >> ", cmdline)
-        if cmdline:sub(1, 1) == '.' then
-            ucmd.dispatch(cmdline)
-            return
-        end
-        g_session:notify('execute_cmd', cmdline)
-    end
-
-    function service.collect_commands()
-        local result = table {}
-        for _, dir in ipairs(plugin_dirs) do
-            for p in os.glob(path.join(dir, 'udbg', 'command', '*')) do
-                local cmd = path.splitext(path.basename(p))
-                result:insert(cmd)
-            end
-        end
-        for cmd, _ in pairs(ucmd.cache) do
-            result:insert(cmd)
-        end
-        return result
+        client:finallyExit(code)
     end
 end
 
 do  -- start session
+    require 'udbg.luadebug'.add(INIT_COROUTINES)
+
     local remote = args.remote
     if remote then
         -- map the domain
@@ -321,51 +441,8 @@ do  -- start session
         args.real_remote = remote
     end
     local ss = client:start_session(remote)
+    ---@type RpcSession
     _ENV.g_session = ss
-    _ENV.g_shell_args = args
-
-    function event.on.ui_inited(map)
-        if config.show_window then
-            ui.main 'show'
-        end
-        require 'udbg.client.ui'
-        g_session:notify('fire_event', {'ui-inited', map})
-    end
-
-    function event.on.cui_init()
-        client:load_history(path.join(config.data_dir, '.cmd-history'))
-    end
-
-    function event.on.cui_close()
-        client:exit_ui(0)
-    end
-
-    function event.on.target_success(info)
-        client.target_alive = true
-        ui.log('[target]', info)
-        ui.add_recently(info.path)
-        ui_notify(2, info)
-    end
-
-    function event.on.target_end()
-        client.target_alive = false
-        ui.g_status:set('text', 'Ended')
-    end
-
-    function event.on.session_close()
-        _ENV.g_session = nil
-        ui.error('session disconnected')
-        ui.g_status.style = 'color:red;'
-        ui.g_status:set('text', 'Disconnect')
-    end
-
-    function event.on.user_close()
-        if g_session then
-            g_session:notify('fire_event', 'user-close')
-        else
-            client:exit_ui(0)
-        end
-    end
 
     local function update_table_from_shell(t, item)
         local pos = item:find('=', 1, true)
@@ -386,7 +463,7 @@ do  -- start session
 
     -- set udbg.dbgopt
     ss:notify('update_global', {'udbg.dbgopt', args.opt})
-    local cfg = {}
+    local cfg = config.udbg_config or {}
     for _, item in ipairs(args.config) do
         update_table_from_shell(cfg, item)
     end
@@ -401,55 +478,36 @@ do  -- start session
         end
     end
 
-    -- execute udbg.plugin.init
+    -- execute udbg.client.__init
     for _, dir in ipairs(plugin_dirs) do
-        local lua_path = path.join(dir, 'udbg', 'plugin', 'init.lua')
-        verbose('[plugin.init]', lua_path)
-        execute_lua(lua_path)
+        local lua_path = path.join(dir, 'udbg', 'client', '__init.lua')
+        if path.exists(lua_path) then
+            verbose('[udbg.client.__init]', lua_path)
+            assert(event.async_call(assert(loadfile(lua_path))))
+        end
+    end
+
+    -- execute udbg.__init
+    for _, dir in ipairs(plugin_dirs) do
+        local lua_path = path.join(dir, 'udbg', '__init.lua')
+        if path.exists(lua_path) then
+            verbose('[udbg.__init]', lua_path)
+            execute_lua(lua_path)
+        end
     end
 
     -- execute lua for shell-args
     for _, mod_path in ipairs(args.execute) do
         assert(
-            execute_bin(mod_path, {watch = args.watch}),
+            client:execute_bin(mod_path, {watch = args.watch}),
             mod_path .. ' not found'
         )
     end
 
-    event.on('execute_cmd', service.execute_cmd)
-
-    function event.on.ui_pause(reason)
-        print('[pause]', reason)
-        service.execute_cmd('dis _pc -u 5 5')
-    end
-
-    -- monitor autorun
-    function event.on.file_write(p)
-        verbose('[file-write]', p)
-        local _, ext = path.splitext(p)
-        if ext:startswith 'lua' then
-            local data = assert(readfile(p))
-            local lineiter = data:gsplit '\n'
-            local target = nil
-            for i = 1, 10 do
-                local line = lineiter()
-                if not line then break end
-                target = line:match '%s*%-%-+%s*udbg@(.-)%s+%-%-+'
-                if target then break end
-            end
-
-            if target then
-                ui.info('[autorun]', 'target:', target)
-            end
-
-            if target == '.client' then
-                assert(event.async_call(assert(load(data, p))))
-            else
-                execute_lua(p, data)
-            end
-        end
-    end
     for _, dir in ipairs(plugin_dirs) do
-        client:watch(path.join(dir, 'autorun'))
+        dir = path.join(dir, 'autorun')
+        if path.isdir(dir) then
+            client:watch(dir)
+        end
     end
 end
