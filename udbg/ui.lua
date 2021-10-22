@@ -834,13 +834,16 @@ local thread = thread
 local cond = thread.condvar()
 
 function ui.pause(reason)
-    -- TODO: console mode
     ui.g_status:set('text', reason or 'Paused')
     ui.stack.address = reg._sp
     ui.view_regs('setRegs', udbg.target:register())
     ui.view_disasm:set('pc', reg._pc)
-    ui.goto_cpu(reg._pc)
-    ui.main 'alertWindow'
+    if ui.cuiMode then
+        ucmd('dis '..hex(reg._pc)..' 3 -u 3')
+    else
+        ui.goto_cpu(reg._pc)
+        ui.main 'alertWindow'
+    end
     local r = cond:wait()
     ui.view_disasm:set('pc', 0)
     ui.g_status:set('text', 'Running')
@@ -850,6 +853,11 @@ end
 
 function ui.continue(a, b)
     cond:notify_one {a, b}
+end
+
+function ui.try_break()
+    local target = udbg.target
+    return target and target:pause()
 end
 
 function ui.goto_cpu(a)

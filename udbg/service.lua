@@ -1,6 +1,5 @@
 
 local service = require 'udbg.base.service'
-local types = require 'udbg.types'
 local ui = require 'udbg.ui'
 local event = require 'udbg.event'
 local unpack, type = table.unpack, type
@@ -76,79 +75,6 @@ function service.engine_command(cmdline)
         udbg.do_cmd(cmdline)
         busy = false
     end, {name = 'engine-command'})
-end
-
-do  -- Struct Monitor View
-    local function get_value(ty, address)
-        if ty.name and ty.name:match 'char%s*%*$' then
-            return read_string(read_ptr(address))
-        end
-        if ty.pointer_level then return hex(read_ptr(address)) end
-        if ty.struct then return "" end
-        local val = types.read_type(ty, address)
-        if not val then return '?' end
-        if ty.pointer_level then return hex(val) end
-        if is_integer(val) then
-            return val .. ', ' .. hex(val)
-        end
-        return val
-    end
-
-    function service.get_value(args)
-        local ts, addr = unpack(args)
-        local address = parse_address(addr)
-        if not address then return '<address error>' end
-        local ty = types.def(ts)
-        return get_value(ty, address)
-    end
-    
-    function service.get_childs_value(args)
-        local ts, addr = unpack(args)
-        local address = parse_address(addr)
-        local ty = types.def(ts)
-        local field_list = ty.field_list
-        if ty.pointer_level == 1 then
-            address = address and read_ptr(address)
-        end
-        if not address then return '<address error>' end
-        if not field_list then return '<no fields>' end
-        local result = {}
-        for _, f in ipairs(field_list) do
-            local a = address + f.offset
-            table.insert(result, {a, get_value(f.type, a)})
-        end
-        return result
-    end
-    
-    -- get type info from string
-    -- @param ts: type string
-    function service.get_type(ts)
-        local ty = types.def(ts)
-        local has_child = ty.struct
-        return {has_child = has_child, size = ty.size}
-    end
-    
-    -- get field list of the type: ts
-    -- @param ts: parent type string
-    function service.get_field_list(ts)
-        local ty = types.def(ts)
-        local field_list = ty.field_list
-        if ty.pointer_level == 1 then
-            field_list = ty.field_list
-        end
-        local result = {}
-        if field_list then
-            for i, f in ipairs(field_list) do
-                local ty = f.type
-                local has_child = ty.struct and (ty.pointer_level or 0) < 2
-                result[i] = {
-                    name = f.name, type = ty.name, size = ty.size,
-                    offset = f.offset, has_child = has_child,
-                }
-            end
-        end
-        return result
-    end
 end
 
 return service

@@ -230,6 +230,7 @@ mod.init = qt.inGui(function()
         qt.connect(mod.actionSwitchToConsole, 'triggered()', function()
             ffi.C.SetForegroundWindow(ffi.C.GetConsoleWindow())
             mod.main:hide()
+            g_session:notify('call', "ui.cuiMode = true")
         end)
     end
 

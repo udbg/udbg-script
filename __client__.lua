@@ -26,7 +26,7 @@ client.config_path = path.exists(config_path) and config_path or (function()
         end
         dir = path.dirname(dir)
     end
-    writefile(config_path, require 'udbg.client.defaultconfig')
+    path.copy(path.join(root_dir, 'default-config.lua'), config_path)
     return config_path
 end)()
 
@@ -232,7 +232,6 @@ client:set('service', service)
 client.service = service do
     function service.ui_info(device)
         -- log('device', device)
-        g_client:set('udbg_inited', true)
         local data_dir = path.join(config.data_dir, assert(device.id))
         os.mkdirs(data_dir)
         g_client.data_dir = data_dir
@@ -253,7 +252,8 @@ CREATE TABLE IF NOT EXISTS target_history (
         path COLLATE NOCASE
     )
 );
-        ]]
+]]
+        g_client:set('udbg_inited', true)
         return data_dir
     end
 
@@ -268,14 +268,38 @@ CREATE TABLE IF NOT EXISTS target_history (
         qt = require 'udbg.client.qt'
         ui = require 'udbg.client.ui'
         client.qt, client.ui = qt, ui
-
-        if not args.no_window then
+        if args.no_window then
+            g_session:notify('call', "ui.cuiMode = true")
+        else
             ui.main:show()
         end
-        ui.init()
+        qt.gui(function()
+            ui.init()
 
-        event.fire('clientUiInited')
-        g_session:notify('call', 'uevent.fire("uiInited")')
+            event.fire('clientUiInited')
+            g_session:notify('call', 'uevent.fire("uiInited")')
+        end)
+    end
+
+    local handleCui = {
+        ['F(7)'] = function() g_session:notify('call', "ui.continue('step')") end,
+        ['F(8)'] = function() g_session:notify('call', "ui.continue('stepout')") end,
+        ['F(9)'] = function() g_session:notify('call', "ui.continue('run', false)") end,
+        ["CONTROL+Char('g')"] = function() g_session:notify('call', "ui.continue('run', false)") end,
+        ['SHIFT+F(9)'] = function() g_session:notify('call', "ui.continue('run', true)") end,
+        ['CONTROL+F(9)'] = function() g_session:notify('call', "ui.continue('stepout')") end,
+        ["CONTROL+Char('d')"] = function() g_session:notify('call', "ui.try_break()") end,
+        ["ALT+Char(';')"] = function()
+            qt.gui(function()
+                g_session:notify('call', "ui.cuiMode = false")
+                ui.main:show()
+                ui.main:setWindowState {'WindowActive'}
+            end)
+        end,
+    }
+    function service.onCuiKeyDown(key)
+        local handler = handleCui[key]
+        return handler and handler()
     end
 
     function service.onCuiClose()

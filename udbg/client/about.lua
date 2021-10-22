@@ -3,12 +3,13 @@
 local about = require 'pl.text'.Template [[
 Version: $version
 <br/>
-Tutorial:
-    <a href="https://udbg.github.io/">https://udbg.github.io/</a>
-<br/>
-Website: <a href="https://gitee.com/udbg/udbg">https://gitee.com/udbg/udbg</a>
+Website: <a href="https://udbg.github.io/">https://udbg.github.io/</a>
 <br/>
 Icon: <a href="https://p.yusukekamiyamane.com/">https://p.yusukekamiyamane.com/</a>
+<br/>
+<br/>
+<a href="https://github.com/udbg/udbg">Github</a>
+<a href="https://gitee.com/udbg/udbg">Gitee</a>
 ]]
 
 local qt = require "udbg.client.qt"

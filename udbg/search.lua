@@ -51,7 +51,6 @@ function UDbgTarget:search_memory(opt)
         pattern = binary_pattern(pattern)
     end
 
-    local target = opt.target or udbg.target
     local start = opt.start and self:parse_address(opt.start)
     start = start or 0
     local stop = opt.stop and self:parse_address(opt.stop)
@@ -91,15 +90,13 @@ function UDbgTarget:yara_search(opt)
     local callback = assert(type(opt.callback) == 'function' and opt.callback)
     local progress = opt.progress
 
-    local start = opt.start and self:parse_address(opt.start)
-    start = start or 0
-    local stop = opt.stop and self:parse_address(opt.stop)
-    stop = stop or 0x7FFFFFFFFFFF
+    local start = opt.start and self:parse_address(opt.start) or 0
+    local stop = opt.stop and self:parse_address(opt.stop) or 0x7FFFFFFFFFFF
     assert(start < stop, 'start must less than stop')
 
     if opt.module then
         local m = assert(self:get_module(opt.module), 'invalid module')
-        start = m.base stop = m.base + m.size
+        start = m.base; stop = m.base + m.size
     end
     -- log('start:', hex(start), 'stop:', hex(stop))
 
@@ -107,10 +104,10 @@ function UDbgTarget:yara_search(opt)
     if not scanner then return err, msg end
 
     local max = opt.max
-    local c = 0
+    local count = 0
     for m in self:enum_memory() do
         if opt.abort then break end
-        if max and c > max then break end
+        if max and count > max then break end
 
         local la, ra = m.base, m.base + m.size
         if ra < start then goto continue end
@@ -121,8 +118,8 @@ function UDbgTarget:yara_search(opt)
         local buf = self:read_bytes(la, ra - la)
         if buf then
             local err, reason = scanner(buf, function(rule, offset, len)
-                c = c + 1
-                if max and c > max then return false end
+                count = count + 1
+                if max and count > max then return false end
                 if false == callback(rule, la + (offset or 0), len or #buf) then
                     opt.abort = true
                     return false

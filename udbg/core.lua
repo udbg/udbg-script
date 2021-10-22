@@ -434,8 +434,5 @@ do
             debuggerThread = nil
             collectgarbage 'collect'
         end, {name = 'debugger'})
-
-        -- wait udbg.target created
-        local _guard<close> = debuggerMutex:lock()
     end
 end

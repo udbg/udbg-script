@@ -1,20 +1,19 @@
 
 <div align="center">
-    <h1>udbg</h1>
-    <a href="https://discord.gg/emqz592zfT">
-      <img src="https://img.shields.io/badge/chat-on%20discord-7289da.svg?style=flat-square" alt="Discord"/>
-    <a href="https://t.me/joinchat/Uiww_6QfRKA1NGY1">
-      <img src="https://img.shields.io/badge/chat-on%20telegram-blue.svg?style=flat-square" alt="Telegram"/>
-    </a>
-    <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=31as7df3-4ddb-4160-aab0-0ab00c45cd24">
-      <img src="https://img.shields.io/badge/chat-on%20feishu-blue.svg?style=flat-square" alt="Telegram"/>
-    </a>
-    </a>
-    <p><b>基于Lua的二进制调试/分析工具</b></p>
-    <ul style="list-style-type: none;">
-        <li><em>多种调试方式，支持远程调试</em></li>
-        <li><em>丰富的脚本接口，方便扩展、定制化分析</em></li>
-    </ul>
+  <img src="https://udbg.github.io/static/image/udbg.png" width="30%">
+  <h1>udbg</h1>
+  <a href="https://discord.gg/emqz592zfT">
+    <img src="https://img.shields.io/badge/chat-on%20discord-7289da.svg?style=flat-square" alt="Discord"/>
+  </a>
+  <a href="https://t.me/joinchat/Uiww_6QfRKA1NGY1">
+    <img src="https://img.shields.io/badge/chat-on%20telegram-blue.svg?style=flat-square" alt="Telegram"/>
+  </a>
+  <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=31as7df3-4ddb-4160-aab0-0ab00c45cd24">
+    <img src="https://img.shields.io/badge/chat-on%20feishu-blue.svg?style=flat-square" alt="Telegram"/>
+  </a>
+  <p><b>基于Lua的二进制调试/分析工具</b></p>
+  <em>多种调试方式，支持远程调试</em><br/>
+  <em>丰富的脚本接口，方便扩展、定制化分析</em>
 </div>
 
 * 支持更多的调试/分析场景
@@ -33,3 +32,20 @@
 - **动态Hook/调用**，注入进程，动态Hook，动态调用目标中的函数，类似于Frida
   - Lua动态Hook目标内任意函数 InlineHook、IATHook
   - Lua调用目标内任意函数，`libffi` `ffi`
+
+## 下载安装
+
+从release页面下载最新的压缩包，并解压到新的目录
+
+* https://github.com/udbg/udbg/releases
+* https://gitee.com/udbg/udbg/releases
+
+>! 注意路径中不要包含非ANSI字符
+
+## 文档
+
+https://udbg.github.io/
+
+- [UDBG介绍](https://udbg.github.io/get_started/zh/)
+- [使用教程](https://udbg.github.io/get_started/zh/quick-start/tutorial.html)
+- [功能截图](https://udbg.github.io/get_started/zh/features.html)

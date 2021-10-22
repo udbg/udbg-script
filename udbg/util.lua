@@ -87,6 +87,38 @@ function UDbgTarget:get_symbol(a, a2)
     end
 end
 
+function auto_matcher(pattern)
+    if pattern:find '^/.*/$' then
+        pattern = pattern:sub(2, -2)
+        local re = require 'regex'.new(pattern)
+        local find = re.find
+        return function(s) return find(re, s) end
+    elseif pattern:find('[%*%?]') then
+        local wildmatch = assert(pattern.wildmatch, 'string.wildmatch')
+        return function(s) return wildmatch(s, pattern) end
+    else
+        local equal = assert(pattern.equal, 'string.equal')
+        return function(s) return equal(pattern, s) end
+    end
+end
+
+function UDbgTarget:module_list(name)
+    local list = table {}
+    local base = tonumber(name, 16)
+    local m = base and self:get_module(base) or self:get_module(name)
+    if m then
+        list:insert(m)
+    else
+        local match = auto_matcher(name)
+        for m in self:enum_module() do
+            if match(m.name) then
+                list:insert(m)
+            end
+        end
+    end
+    return list
+end
+
 ---dissect a pointer
 ---@param p integer @the pointer address
 ---@param ret boolean @parse this pointer as a return point

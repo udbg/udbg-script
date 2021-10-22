@@ -2,6 +2,14 @@
 if os.name == 'windows' then
     function uevent.on.uiInited()
         ui.menu_plugin:add_action {title = '&Window List', on_trigger = ucmd.wrap ':list-window'}
+        ui.menu_plugin:add_action {title = 'Scan &Patch', on_trigger = ucmd.wrap ':scan-patch *'}
+
+        ui.view_module:add_action {title = 'Scan &Patch', on_trigger = function()
+            -- local name = ui.view_module:line('.', 0)
+            local base = ui.view_module:line('.', 1)
+            ucmd(':scan-patch ' .. base)
+        end}
+
         ui.view_handle:add_action {title = '&Close Handle', on_trigger = function(self)
             local h = ui.view_handle:line('.', 2)
             ucmd('close-handle ' .. h)

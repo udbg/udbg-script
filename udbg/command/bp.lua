@@ -25,9 +25,9 @@ bp                                        设置断点
     --caller                              显示调用者
     -m, --module                          模块加载断点
 ]]
-local ui = require 'udbg.uix'
 
-local cmd = function(args)
+function mod.main(args)
+    local ui = require 'udbg.uix'
     local bp_type, bp_size
     if args.type then
         local t, l = string.match(args.type, '([ewa])([1248])')
@@ -95,32 +95,6 @@ local cmd = function(args)
         type = bp_type, size = bp_size
     })
     log('add_bp', hex(bpid))
-end
-
-function mod.main(args)
-    if args.module then
-        if not on_module_bp then
-            MODULE_BPLIST = {}
-            function on_module_bp(base, path)
-                for i, args in ipairs(MODULE_BPLIST) do
-                    if os.path.basename(path:lower()) == args.module then
-                        table.remove(MODULE_BPLIST, i)
-                        ui.info('[bp]', args.address)
-                        cmd(args)
-                    end
-                end
-            end
-            before_global('on_module_load', on_module_bp)
-        end
-
-        args.module = args.address:match('^(.-)!'):lower()
-        if get_module(args.module) then
-            return cmd(args)
-        end
-        table.insert(MODULE_BPLIST, args)
-    else
-        return cmd(args)
-    end
 end
 
 return mod
