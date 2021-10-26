@@ -216,7 +216,7 @@ mod.init = qt.inGui(function()
     end
 
     if os.name == 'windows' then
-        local ffi = require 'ffi'
+        local ffi = require 'cffi'
         ffi.cdef [[
             typedef void *HWND;
             void SetForegroundWindow(HWND);
@@ -412,8 +412,21 @@ mod.init = qt.inGui(function()
                     return method(ctrl, ...)
                 end
             end,
+            -- _memory = memory_view(virtualTableID.memory),
+            rpcModuleRange = function(a)
+                local t = udbg.target
+                local m = t and t:get_module(a)
+                return m and {m.base, m.size, m.arch}
+            end,
+            rpcMemoryRange = function(a)
+                local t = udbg.target
+                local m = t and t:virtual_query(a)
+                return m and {m.base, m.size}
+            end,
         }
     end
+    mod.main:setProperty('rpcModuleRange', rpc.rpcModuleRange)
+    mod.main:setProperty('rpcMemoryRange', rpc.rpcMemoryRange)
 
     qt.slotObject:__addslot('on_followInMemory()', function(self)
         local w = mod.main:focusWidget()
@@ -545,6 +558,7 @@ mod.init = qt.inGui(function()
                         g_session:request('call_global', 'write_type', a, ty, dlg:value())
                         qt.metaCall(mem, 'update()')
                     end
+                    dlg:delete()
                 end
             end
         end)
@@ -590,6 +604,7 @@ mod.init = qt.inGui(function()
                     g_session:request(rpc.set_reg, name:lower(), dlg:value())
                     g_session:notify('call', [[ui.view_regs('setRegs', udbg.target:register())]])
                 end
+                dlg:delete()
             end
         end)
     end

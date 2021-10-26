@@ -178,8 +178,8 @@ end
 
 function StackView.__set:address(val)
     self.itemSize = udbg.target.psize
-    self:updatePage(val)
-    self._address = assert(val)
+    self:updatePage(assert(val))
+    self._address = val
     self._stack = val
     self:onUpdate()
 end

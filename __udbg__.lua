@@ -41,7 +41,7 @@ if os.name == 'windows' then
     local reg = require 'win.reg'
     device.id = reg.HKEY_LOCAL_MACHINE:open [[SOFTWARE\Microsoft\Cryptography]]:get 'MachineGuid'
 elseif os.name == 'android' then
-    device.id = io.popen 'getprop ro.serialno':read 'a'
+    device.id = 'android-' .. io.popen 'getprop ro.serialno':read 'a':trim()
 else
     local mid = readfile '/etc/machine-id' or readfile '/var/lib/dbus/machine-id'
     device.id = mid and mid:trim() or select(2, io.popen 'uname -a':read 'a':splitv '%s+')

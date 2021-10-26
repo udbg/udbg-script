@@ -129,6 +129,7 @@ do
             psize = target.psize,
             os = os.name,
             arch = target.arch,
+            name = target.name,
             path = target.path,
             os_psize = __llua_psize
         })
@@ -228,12 +229,15 @@ do
         end
     end
 
+    local is_windows = os.name == 'windows'
     local function on_thread_create(tid)
         local t = target:open_thread(tid)
         event.fire('targetThreadCreate', t)
-        local info = ''
-        if t and t.teb > 0 then info = hex(t.teb) end
-        if t and t.name then info = t.name end
+        local info = t and t.name or ''
+        if is_windows then
+            local teb = t and t.teb or 0
+            if teb > 0 then info = info..' '..hex(t.teb) end
+        end
         ui.info('[thread_create]', tid, info)
         if __config.pause_thread_create then
             return ui.pause('ThreadCreate')
@@ -338,9 +342,11 @@ do
             if type(pid) ~= 'number' then
                 pid = tonumber(pid)
                 if not pid then
+                    -- TODO: import auto_matcher
+                    local match = auto_matcher(target)
                     -- find process by name
                     for ps in engine:enum_process() do
-                        if ps.name:equal(target) then
+                        if match(ps.name) then
                             pid = ps.pid
                             break
                         end

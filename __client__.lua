@@ -116,23 +116,6 @@ do  -- load config/client.lua, init the plugin_dirs and package.path
     end
     assert(path.exists(config.data_dir))
 
-    if not config.edit_cmd then
-        local editor = nil
-        for _, item in ipairs {'code', 'notepad++'} do
-            local _, _, code = io.popen('where ' .. item):close()
-            if code == 0 then
-                editor = item
-                break
-            end
-        end
-        if editor then
-            log.info('detected editor:', editor)
-            config.edit_cmd = editor .. ' %1'
-        else
-            config.edit_cmd = 'start notepad %1'
-        end
-    end
-
     for _, plug in ipairs(config.plugins) do
         if type(plug) == 'string' then
             plug = {path = plug}
@@ -176,6 +159,23 @@ local function execute_lua(lua_path, data, mod_path)
 end
 
 function client:edit_script(lua_path)
+    if not config.edit_cmd then
+        local editor = nil
+        for _, item in ipairs {'code', 'notepad++'} do
+            local _, _, code = io.popen('where ' .. item):close()
+            if code == 0 then
+                editor = item
+                break
+            end
+        end
+        if editor then
+            log.info('detected editor:', editor)
+            config.edit_cmd = editor .. ' %1'
+        else
+            config.edit_cmd = 'start notepad %1'
+        end
+    end
+
     os.execute(config.edit_cmd:gsub('%%1', lua_path))
 end
 
@@ -231,7 +231,7 @@ client:set('service', service)
 -- rpc service function
 client.service = service do
     function service.ui_info(device)
-        -- log('device', device)
+        verbose('[device]', device)
         local data_dir = path.join(config.data_dir, assert(device.id))
         os.mkdirs(data_dir)
         g_client.data_dir = data_dir
@@ -380,7 +380,7 @@ CREATE TABLE IF NOT EXISTS target_history (
         end
     end
 
-    local arch = {x86 = 0, x86_64 = 1, arm = 2, arm64 = 3}
+    local arch = {x86 = 0, x86_64 = 1, arm = 2, arm64 = 3, aarch64 = 3}
     function service.onTargetSuccess(info)
         client.target_alive = true
         client:set('target_alive', true)

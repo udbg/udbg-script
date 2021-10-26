@@ -202,7 +202,7 @@ do      -- ui utils
         end
 
         function log:__call(...)
-            return ui_notify(INFO, concat(...))
+            return ui_notify(LOG, concat(...))
         end
 
         function log.color_line(line)
@@ -975,6 +975,7 @@ function ui.update_thread_list()
             }
             if ok then t:resume() end
         else
+            data:insert {tid, t.name, t.status, t.priority, ''}
         end
     end
     table.sort(data, function(a, b) return a[1] < b[1] end)
@@ -1092,8 +1093,8 @@ function event.on.uiInited()
         end,
     }
 
+    local view_thread = ui.view_thread
     if windows then
-        local view_thread = ui.view_thread
         view_thread:set('columns', {
             {name = 'TID', width = 6},
             {name = 'Entry', width = 30},
@@ -1162,6 +1163,14 @@ function event.on.uiInited()
                 echo(tid, open_thread(tid))
             end
         end)
+    else
+        view_thread:set('columns', {
+            {name = 'TID', width = 6},
+            {name = 'Name', width = 15},
+            {name = 'Status', width = 18},
+            {name = 'Priority', width = 8},
+            {name = 'PC', width = 30},
+        })
     end
 
     ui.menu_option:add_action {
@@ -1287,8 +1296,11 @@ function event.on.targetSuccess()
 
     if image_base == 0 then
         local m = target:enum_module()()
-        image_base = m and m.base or 0
-        target.image = m
+        if m then
+            image_base = m.base
+            target.image = m
+            target.image_base = image_base
+        end
     else
         target.image = target:get_module(image_base)
     end

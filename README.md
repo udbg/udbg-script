@@ -12,8 +12,8 @@
     <img src="https://img.shields.io/badge/chat-on%20feishu-blue.svg?style=flat-square" alt="Telegram"/>
   </a>
   <p><b>Dynamic binary analysis tools based on Lua</b></p>
-  <em>Multiple debug-adaptor, support remote debugging</em><br/>
-  <em>Rich script API, and easy to extend and customize</em>
+  <em>Various debug-adaptor, remote debugging support</em><br/>
+  <em>Rich script API, easy to extend and customize</em>
 </div>
 
 Dynamic binary analysis tools based on Lua
