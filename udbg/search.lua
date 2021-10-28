@@ -2,7 +2,9 @@
 local strchar = string.char
 local tonumber = tonumber
 
-function binary_pattern(pat)
+local mod = {}
+
+function mod.binary_pattern(pat)
     return pat:gsub('%s*%S+%s*', function(pat)
         pat = pat:trim()
         if pat:find('?', 1, true) then
@@ -14,12 +16,8 @@ function binary_pattern(pat)
     end)
 end
 
-function search_binary(data, pat)
-    local pattern = binary_pattern(pat)
-    -- return function(data, i)
-    --     local r = data:find(pattern, i + 2)
-    --     if r then return r - 1 end
-    -- end, data, -1
+function mod.search_binary(data, pat)
+    local pattern = mod.binary_pattern(pat)
     local i = 1
     return function()
         local r = data:find(pattern, i)
@@ -35,7 +33,7 @@ function UDbgTarget:find_binary(opt)
     local pattern = assert(opt.pattern or opt[2])
     local size = opt.size or opt[3] or 0x1000
 
-    local iter = search_binary(self:read_bytes(a, size), pattern)
+    local iter = mod.search_binary(self:read_bytes(a, size), pattern)
     return function()
         local offset = iter()
         if offset then
@@ -48,7 +46,7 @@ function UDbgTarget:search_memory(opt)
     local pattern = opt.pattern or opt[1]
     if opt.binary then
         opt.plain = false
-        pattern = binary_pattern(pattern)
+        pattern = mod.binary_pattern(pattern)
     end
 
     local start = opt.start and self:parse_address(opt.start)
@@ -133,3 +131,5 @@ function UDbgTarget:yara_search(opt)
         ::continue::
     end
 end
+
+return mod

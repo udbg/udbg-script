@@ -112,17 +112,19 @@ function mod.main(args, out)
     if out.tbl then
         out.tbl.result = result
     end
+
+    local target = assert(udbg.target)
     local function output(cs, item)
         local exp = item.export
         if exp then
-            out(hex(item.address), exp.Name, 4, '<export>', udbg.target:get_symbol(exp.Address))
+            out(hex(item.address), exp.Name, 4, '<export>', target:get_symbol(exp.Address))
         else
             result[item.address] = item
-            out(hex(item.address), udbg.target:get_symbol(item.address), item.length, item.f:tohex(), item.m:tohex(), cs:disasm(item.address)[1].string)
+            out(hex(item.address), target:get_symbol(item.address), item.length, item.f:tohex(), item.m:tohex(), cs:disasm(item.address, target)[1].string)
         end
     end
 
-    local list = udbg.target:module_list(args.module)
+    local list = target:module_list(args.module)
     require 'udbg.task'.spawn(function(task)
         for i, m in ipairs(list) do
             local cs = Capstone.new(m.arch)

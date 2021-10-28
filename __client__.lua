@@ -97,9 +97,9 @@ local config = {
 }
 client.config = setmetatable(config, {__index = _ENV})
 
-local plugin_dirs = table {script_dir}
-client.plugin_dirs = plugin_dirs
-do  -- load config/client.lua, init the plugin_dirs and package.path
+local runtime_dirs = table {script_dir}
+client.runtime_dirs = runtime_dirs
+do  -- load config/client.lua, init the runtime_dirs and package.path
     local data = readfile(config_path)
     if data then
         verbose('[config path]', config_path)
@@ -120,14 +120,26 @@ do  -- load config/client.lua, init the plugin_dirs and package.path
         if type(plug) == 'string' then
             plug = {path = plug}
         end
-        if plug.path then
-            local dir = plug.path
+        if plug.git then
+            if not plug.name then
+                plug.name = path.basename(plug.git)
+            end
+            if config.plugins[plug.name] then
+                error('plugin '..plug.name..' exists')
+            end
+            config.plugins[plug.name] = plug
+            if not plug.path then
+                plug.path = path.join(config.data_dir, '.repo', plug.name)
+            end
+        end
+        local dir = plug.path
+        if dir then
             if path.isdir(dir) then
-                plugin_dirs:insert(dir)
+                runtime_dirs:insert(dir)
                 table.insert(lua_paths, path.join(dir, '?.lua'))
                 table.insert(lua_paths, path.join(dir, '?.luac'))
             else
-                log.error(pretty % dir, 'is not directory')
+                log.warn(pretty % dir, 'is not directory')
             end
         end
     end
@@ -135,7 +147,7 @@ do  -- load config/client.lua, init the plugin_dirs and package.path
 end
 
 local function find_lua(...)
-    for _, dir in ipairs(plugin_dirs) do
+    for _, dir in ipairs(runtime_dirs) do
         local p = path.join(dir, ...)
         if path.isfile(p) then
             return p
@@ -338,7 +350,7 @@ CREATE TABLE IF NOT EXISTS target_history (
         else
             log('[cmd] >>', cmdline)
             if cmdline:sub(1, 1) == '.' then
-                ucmd.dispatch(cmdline)
+                ucmd.dispatch(cmdline, 'udbg.client.cmd.')
             else
                 g_session:notify('execute_cmd', cmdline)
             end
@@ -494,7 +506,7 @@ do  -- start session
     ss:notify('update_global', {'__config', cfg})
 
     -- execute client.init
-    for _, dir in ipairs(plugin_dirs) do
+    for _, dir in ipairs(runtime_dirs) do
         local lua_path = path.join(dir, 'udbg', 'client-init.lua')
         if path.exists(lua_path) then
             verbose('[client-init]', lua_path)
@@ -503,7 +515,7 @@ do  -- start session
     end
 
     -- execute udbg.client.__init
-    for _, dir in ipairs(plugin_dirs) do
+    for _, dir in ipairs(runtime_dirs) do
         local lua_path = path.join(dir, 'udbg', 'client', '__init.lua')
         if path.exists(lua_path) then
             verbose('[udbg.client.__init]', lua_path)
@@ -512,7 +524,7 @@ do  -- start session
     end
 
     -- execute udbg.__init
-    for _, dir in ipairs(plugin_dirs) do
+    for _, dir in ipairs(runtime_dirs) do
         local lua_path = path.join(dir, 'udbg', '__init.lua')
         if path.exists(lua_path) then
             verbose('[udbg.__init]', lua_path)
@@ -528,7 +540,7 @@ do  -- start session
         )
     end
 
-    for _, dir in ipairs(plugin_dirs) do
+    for _, dir in ipairs(runtime_dirs) do
         dir = path.join(dir, 'autorun')
         if path.isdir(dir) then
             client:watch(dir)

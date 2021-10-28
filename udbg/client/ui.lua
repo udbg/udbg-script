@@ -146,75 +146,6 @@ qt.gui(function()
 end, true)
 
 mod.init = qt.inGui(function()
-    local ValueDialog = qt.Class("ValueDialog", qt.QDialog) {} do
-        function ValueDialog:__init(value)
-            local flags = self:windowFlags()
-            table.removevalue(flags, 'WindowContextHelpButtonHint')
-            self:setWindowFlags(flags)
-            local ValueDialog = self
-            -- generate widget
-            ValueDialog:resize(424, 154)
-            ValueDialog:setWindowTitle("Input Value")
-            local verticalLayout = qt.QVBoxLayout.new(ValueDialog); self.verticalLayout = verticalLayout
-            verticalLayout:setObjectName("verticalLayout")
-            local formLayout = qt.QFormLayout.new(); self.formLayout = formLayout
-            formLayout:setObjectName("formLayout")
-            local label = qt.QLabel.new(); self.label = label
-            label:setObjectName("label")
-            label:setText("Expression")
-            formLayout:setWidget(0, 0, label)
-            local expr = qt.QLineEdit.new(); self.expr = expr
-            expr:setObjectName("expr")
-            formLayout:setWidget(0, 1, expr)
-            local label_2 = qt.QLabel.new(); self.label_2 = label_2
-            label_2:setObjectName("label_2")
-            label_2:setText("Hexiadecimal")
-            formLayout:setWidget(1, 0, label_2)
-            local hex = qt.QLineEdit.new(); self.hex = hex
-            hex:setObjectName("hex")
-            hex:setReadOnly(true)
-            formLayout:setWidget(1, 1, hex)
-            local label_3 = qt.QLabel.new(); self.label_3 = label_3
-            label_3:setObjectName("label_3")
-            label_3:setText("Decimal")
-            formLayout:setWidget(2, 0, label_3)
-            local dec = qt.QLineEdit.new(); self.dec = dec
-            dec:setObjectName("dec")
-            dec:setEnabled(false)
-            formLayout:setWidget(2, 1, dec)
-            verticalLayout:addLayout(formLayout)
-            local buttonBox = qt.QDialogButtonBox.new(); self.buttonBox = buttonBox
-            buttonBox:setObjectName("buttonBox")
-            buttonBox:setOrientation(qt.Horizontal)
-            buttonBox:setStandardButtons(qt.QDialogButtonBox.Cancel|qt.QDialogButtonBox.Ok)
-            verticalLayout:addWidget(buttonBox)
-            -- generate connections
-            buttonBox:connect("2accepted()", ValueDialog, "1accept()")
-            buttonBox:connect("2rejected()", ValueDialog, "1reject()")
-
-            expr:connect('2textChanged(QString)', function(self, text)
-                text = text:toStdString()
-                local hexText = text:gsub('[^%x]+', '')
-                if #hexText then
-                    hex:setText(hexText)
-                    dec:setText(tostring(tonumber(hexText, 16)))
-                end
-                if text ~= hexText then
-                    expr:setStyleSheet 'border: 1px solid red;'
-                else
-                    expr:setStyleSheet ''
-                end
-            end)
-            if value then
-                expr:setText(tostring(value))
-            end
-        end
-
-        function ValueDialog:value()
-            return tonumber(self.hex:text():toStdString():gsub('^0[xX]', ''), 16)
-        end
-    end
-
     if os.name == 'windows' then
         local ffi = require 'cffi'
         ffi.cdef [[
@@ -378,7 +309,7 @@ mod.init = qt.inGui(function()
                 return udbg.target:parse_address(a)
             end,
             disasm_jump = function(a)
-                local insn = disasm(a)
+                local insn = udbg.target:disasm(a)
                 if insn then
                     local ot, val = insn('operand', 0)
                     if ot == 'mem' then
@@ -392,7 +323,7 @@ mod.init = qt.inGui(function()
                 end
             end,
             disasm_jumpmem = function(a)
-                local insn = disasm(a)
+                local insn = udbg.target:disasm(a)
                 if insn then
                     for i = 0, 5 do
                         local ot, val = insn('operand', i)
@@ -552,12 +483,13 @@ mod.init = qt.inGui(function()
                 local a = qt.metaGet(mem, 'cursorAddress'):toULongLong()
                 local val = ty and g_session:request('call_global', 'read_type', a, ty)
                 if val then
-                    local dlg = ValueDialog({mod.main}, '%x' % val)
+                    local dlg = require 'udbg.client.dlg'.ValueDialog({mod.main}, '%x' % val)
                     dlg:setWindowTitle('Edit '..ty..'@'..hex(a))
                     if dlg:exec() == qt.QDialog.Accepted then
                         g_session:request('call_global', 'write_type', a, ty, dlg:value())
                         qt.metaCall(mem, 'update()')
                     end
+                    -- prevent to delete() in other thread
                     dlg:delete()
                 end
             end
@@ -598,7 +530,7 @@ mod.init = qt.inGui(function()
             if g_client.target_alive then
                 local name = reg:toStdString()
                 -- local regs = self:sender()
-                local dlg = ValueDialog({mod.main}, '%x' % value)
+                local dlg = require 'udbg.client.dlg'.ValueDialog({mod.main}, '%x' % value)
                 dlg:setWindowTitle('Edit register: '..name)
                 if dlg:exec() == qt.QDialog.Accepted then
                     g_session:request(rpc.set_reg, name:lower(), dlg:value())
@@ -646,10 +578,15 @@ mod.init = qt.inGui(function()
 
         -- collect commands
         local result = qt.QStringList()
-        for _, dir in ipairs(g_client.plugin_dirs) do
+        for _, dir in ipairs(g_client.runtime_dirs) do
             for p in os.glob(os.path.join(dir, 'udbg', 'command', '*')) do
                 local cmd = os.path.splitext(os.path.basename(p))
                 result:push_back(cmd)
+            end
+            -- client commands
+            for p in os.glob(os.path.join(dir, 'udbg', 'client', 'cmd', '*')) do
+                local cmd = os.path.splitext(os.path.basename(p))
+                result:push_back('.'..cmd)
             end
         end
         local ucmd = require 'udbg.cmd'
@@ -736,7 +673,9 @@ mod.init = qt.inGui(function()
         end
     end)
 
-    qt.connect(mod.actionAbout, 'triggered()', function() require 'udbg.client.about'() end)
+    qt.connect(mod.actionAbout, 'triggered()', function()
+        require 'udbg.client.dlg'.AboutDialog.new():exec()
+    end)
 
     local timerUpdate = qt.QTimer.new(mod.main)
     local count = 0

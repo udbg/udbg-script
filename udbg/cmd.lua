@@ -201,7 +201,7 @@ function cmd.find(name, prefix)
     -- try load from file
     if not result then
         prefix = prefix or cmd.prefix
-        local modpath = prefix .. name
+        local modpath = prefix..name:gsub('^%.+', '')
         result = cmd.load(modpath, not cmd.use_cache)
         if type(result) == 'function' then
             result = {main = result, name = name}

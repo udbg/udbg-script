@@ -262,18 +262,23 @@ do -------- Extend global --------
     end
     set_psize(__llua_psize)
 
-    local cs = Capstone.new(os.arch)
-    local dis = cs.disasm
-    function disasm(address)
-        local insns = dis(cs, address)
+    local disasm = Capstone.disasm
+    function UDbgTarget:disasm(address)
+        local cs = self.capstone
+        if not cs then
+            cs = Capstone.new(self.arch)
+            self.capstone = cs
+        end
+        local insns = disasm(cs, address, self)
         return insns and insns[1]
     end
 
-    function enum_disasm(a, max)
+    local target_disasm = UDbgTarget.disasm
+    function UDbgTarget:enum_disasm(a, max)
         local n = max or 1000
         return function()
             if n == 0 then return end
-            local insn = disasm(a)
+            local insn = target_disasm(self, a)
             if insn then
                 a = a + insn.size
             end
@@ -282,13 +287,14 @@ do -------- Extend global --------
         end
     end
 
-    function uevent.on.context_change(psize, arch)
+    local cs = Capstone.new(os.arch)
+    function uevent.on.targetContextChanged(psize, arch)
         ui.info('context_change', psize, arch)
         cs = Capstone.new(arch)
         set_psize(psize)
         if udbg.target then
             udbg.target.psize = psize
-            udbg.set('Capstone.new', cs)
+            udbg.set('capstone', cs)
         end
     end
 end
