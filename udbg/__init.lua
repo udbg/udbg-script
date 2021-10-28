@@ -1,5 +1,7 @@
 
 if os.name == 'windows' then
+    package.cpath = os.path.dirname(os.getexe())..[[\?54.dll;]]..package.cpath
+
     function uevent.on.uiInited()
         ui.menu_plugin:add_action {title = '&Window List', on_trigger = ucmd.wrap ':list-window'}
         ui.menu_plugin:add_action {title = 'Scan &Patch', on_trigger = ucmd.wrap ':scan-patch *'}

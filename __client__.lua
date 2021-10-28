@@ -109,12 +109,12 @@ do  -- load config/client.lua, init the runtime_dirs and package.path
     end
 
     if not config.data_dir then
-        config.data_dir = path.join(root_dir, 'data')
+        config.data_dir = path.join(path.dirname(root_dir), '.udbg-data')
         if not path.isdir(config.data_dir) then
             os.mkdir(config.data_dir)
         end
     end
-    assert(path.exists(config.data_dir))
+    assert(path.isdir(config.data_dir))
 
     for _, plug in ipairs(config.plugins) do
         if type(plug) == 'string' then
