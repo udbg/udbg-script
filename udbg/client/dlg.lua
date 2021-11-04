@@ -1,5 +1,6 @@
 
 local qt = require 'udbg.client.qt'
+local q = qt.helper
 
 local mod = {}
 
@@ -101,6 +102,69 @@ Icon: https://p.yusukekamiyamane.com/
         label:setOpenExternalLinks(true)
         v:addWidget(label)
     end
+end
+
+do
+    local comp = qt.QCompleter.new(qt.QStringList())
+    comp:setMaxVisibleItems(12)
+    comp:setFilterMode {'MatchContains'}
+    comp:setCaseSensitivity 'CaseInsensitive'
+
+    local rpc = g_session:requestTempMethod(function()
+        return require 'udbg.service' << {
+            completeSymbol = function(symbol)
+                local target = udbg.target
+                if not target then return {} end
+
+                local module, name = symbol:splitv '!'
+                if not name then name, module = module, nil end
+                if not name then return {} end
+
+                module = module and assert(target:get_module(module), 'get module')
+                local res = table {}
+                for m in module and require 'pl.seq'.list{module} or target:enum_module() do
+                    for sym in m:enum_symbol(name..'*') do
+                        if #res >= 320 then goto RETURN end
+                        res:insert(m.name..'!'..sym.name)
+                    end
+                end
+
+                ::RETURN:: return res
+            end
+        }
+    end)
+
+    local edit = q.QLineEdit {
+        setCompleter = comp,
+        setObjectName = 'lineEdit',
+        ['textEdited(QString)'] = function(self)
+            self:killTimer(self.completeTimer or -1)
+            self.completeTimer = self:startTimer(300)
+        end
+    }
+    function edit:timerEvent(timer)
+        self:killTimer(self.completeTimer)
+        local m = comp:model():cast()
+        local list = g_session:request(rpc.completeSymbol, self:text():toStdString())
+        m:setStringList(q.QStringList(list))
+        comp:complete()
+    end
+
+    local buttonBox = qt.QDialogButtonBox.new()
+    buttonBox:setOrientation(qt.Horizontal)
+    buttonBox:setStandardButtons {'Cancel', 'Ok'}
+
+    mod.addressDialog = q.QDialog {
+        resize = {400, 150},
+        -- setParent = g_client.ui.main,
+        setWindowFlags = {"Window", "WindowCloseButtonHint", "WindowTitleHint"},
+        setLayout = q.QVBoxLayout {
+            edit, buttonBox
+        },
+    }
+    mod.addressDialog:setAttribute('WA_DeleteOnClose', false)
+    buttonBox:connect("2accepted()", mod.addressDialog, "1accept()")
+    buttonBox:connect("2rejected()", mod.addressDialog, "1reject()")
 end
 
 return mod

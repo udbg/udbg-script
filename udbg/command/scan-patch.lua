@@ -16,6 +16,8 @@ local function on_revert(obj)
     log('[patch]', 'revert', udbg.target:get_symbol(address), udbg.target:write_bytes(item.address, item.f))
 end
 
+local uext = require 'uext'
+
 function mod.scaner(m, opt)
     if type(m) ~= "userdata" then
         m = assert(udbg.target:get_module(m), 'module not exists')
@@ -23,8 +25,8 @@ function mod.scaner(m, opt)
 
     local IMAGE_SCN_MEM_WRITE = 0x80000000
     local IMAGE_SCN_MEM_EXECUTE = 0x20000000
-    local pe = PEUtil.from_file(m.path)
-    local mpe = PEUtil.from_base(m.base)
+    local pe = uext.PEUtil.from_file(m.path)
+    local mpe = uext.PEUtil.from_base(m.base)
     if not pe then
         error('parse ' .. m.name .. ' failed')
     end

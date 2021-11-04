@@ -659,12 +659,11 @@ mod.init = qt.inGui(function()
     qt.slotObject:__addslot('on_cpuMemKeyPress(QKeyEvent*)', function(self, key)
         if key:key() == qt.Key_G and table.concat(key:modifiers()) == 'ControlModifier' then
             key:accept()
-            local lineEdit = mod.addressDialog:findChild'lineEdit'
-            qt.singleShotTimer(10, function()
-                qt.metaCall(lineEdit, 'popupHistory()')
-            end)
-            if mod.addressDialog:exec() > 0 then
-                local a = qt.metaCall(lineEdit, 'addHistoryClear()'):trimmed()
+            local addressDialog = require 'udbg.client.dlg'.addressDialog
+            local lineEdit = addressDialog:findChild'lineEdit'
+            lineEdit:selectAll()
+            if addressDialog:exec() > 0 then
+                local a = lineEdit:text()
                 if not a:isEmpty() then
                     a = g_session:request(rpc.parse_address, a:toStdString())
                     a = a and qt.metaSet(self:sender(), 'address', a)

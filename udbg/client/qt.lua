@@ -221,11 +221,16 @@ do  -- qt helper
     local helper = {Strech = {}}
     mod.helper = helper
 
-    function Constructor.QTreeWidgetItem(opt)
+    function Constructor.QStringList(opt)
         local strs = mod.QStringList()
         for i, val in ipairs(opt) do
             strs:append(tostring(val))
         end
+        return strs
+    end
+
+    function Constructor.QTreeWidgetItem(opt)
+        local strs = Constructor.QStringList(opt)
         local res = mod.QTreeWidgetItem.new(strs)
         for _, child in ipairs(opt.childs or empty) do
             res:addChild(Constructor.QTreeWidgetItem(child))
@@ -298,11 +303,11 @@ do  -- qt helper
     end
 
     setmetatable(helper, {__index = function(self, className)
-        local Widget = QtWidgets[className]
+        local Widget = QtWidgets[className] or QtGui[className] or QtCore[className]
         if not Widget then return end
 
-        return function(opt)
-            local ctor = Constructor[className]
+        local ctor = Constructor[className]
+        local res = function(opt)
             local w = ctor and ctor(opt) or Widget.new()
             local isWindow = w.isWindow
 
@@ -351,6 +356,8 @@ do  -- qt helper
             end
             return w
         end
+        rawset(self, className, res)
+        return res
     end})
 end
 
