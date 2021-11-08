@@ -113,7 +113,9 @@ return function(argv)
         local dlg = q.QDialog {
             resize = {0.5, 0.5},
             setWindowTitle = 'PE: '..base,
+            setAttribute = 'WA_DeleteOnClose',
             setWindowFlags = {"Window", 'WindowMinMaxButtonsHint', "WindowCloseButtonHint", "WindowTitleHint"},
+            setStyleSheet = g_client.ui.main:styleSheet(),
             setLayout = q.QVBoxLayout {
                 q.QTabWidget {
                     q.QWidget{setWindowTitle = '&Header', setLayout = q.QVBoxLayout {
@@ -207,7 +209,7 @@ return function(argv)
         }
 
         dlg:show(); dlg:raise()
-        local ui = dlg:namedChildren()
+        local ui = dlg:findChildren(qt.QRegularExpression'.+', 1, true)
 
         local pefile = require 'pefile'
         local info = g_session:request(rpc.basicinfo)

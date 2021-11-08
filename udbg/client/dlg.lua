@@ -162,7 +162,6 @@ do
             edit, buttonBox
         },
     }
-    mod.addressDialog:setAttribute('WA_DeleteOnClose', false)
     buttonBox:connect("2accepted()", mod.addressDialog, "1accept()")
     buttonBox:connect("2rejected()", mod.addressDialog, "1reject()")
 end

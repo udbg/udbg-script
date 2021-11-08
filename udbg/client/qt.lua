@@ -309,11 +309,6 @@ do  -- qt helper
         local ctor = Constructor[className]
         local res = function(opt)
             local w = ctor and ctor(opt) or Widget.new()
-            local isWindow = w.isWindow
-
-            if isWindow and isWindow(w) then
-                w:setAttribute('WA_DeleteOnClose')
-            end
 
             -- set Properties
             for name, val in pairs(opt.__prop or empty) do
