@@ -7,10 +7,11 @@ return function(argv)
         for m in name == '*' and udbg.target:enum_module() or require 'pl.seq'.list{udbg.target:get_module(name)} do
             local sig = m 'pdb_sig'
             if sig then
-                local pdbname = m'pdb_path' and os.path.basename(m'pdb_path') or os.path.withext(m.name, 'pdb')
+                local pdbname = m 'pdb_name' or m'pdb_path' and os.path.basename(m'pdb_path') or os.path.withext(m.name, 'pdb')
                 res:insert {
                     base = m.base,
-                    symdir = os.path.join(symdir, pdbname, sig), pdbname = pdbname, sig = sig
+                    pdbname = pdbname, pdbsig = sig,
+                    symdir = os.path.join(symdir, pdbname, sig),
                 }
             else
                 log.warn(m.name, 'have not pdbinfo')
@@ -21,7 +22,7 @@ return function(argv)
 
     thread.spawn(function()
         table.imap(function(t)
-            local url = 'https://msdl.microsoft.com/download/symbols/' .. t.pdbname .. '/' .. t.sig .. '/' .. t.pdbname
+            local url = 'https://msdl.microsoft.com/download/symbols/' .. t.pdbname .. '/' .. t.pdbsig .. '/' .. t.pdbname
             local pdbpath = os.path.join(t.symdir, t.pdbname)
             if os.path.exists(pdbpath) then
                 log.info('[skip]', pdbpath)
@@ -34,7 +35,7 @@ return function(argv)
                 if status and code == "exit" then
                     log('success', cmd)
                     g_session(function()
-                        get_module(t.base):load_symbol(pdbpath)
+                        get_module(t.base):load_symbol()
                     end)
                 else
                     log.error(status, code)

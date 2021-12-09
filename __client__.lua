@@ -13,6 +13,7 @@ local lua_paths = {
     path.join(script_dir, '?.luac'),
 }
 package.path = table.concat(lua_paths, ';') .. ';' .. origin_paths
+package.cpath = path.join(path.dirname(os.getexe()), '?.'..os.dllextension)
 
 local config_path = args.use_confdir or path.join(root_dir, CONFIG_NAME)
 client.config_path = path.exists(config_path) and config_path or (function()
